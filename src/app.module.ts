@@ -29,6 +29,8 @@ import { FaqsModule } from './modules/faqs/faq.module';
 import { TestimonialsModule } from './modules/testimonials/testimonial.module';
 import { TimelineModule } from './modules/timeline/timeline.module';
 import { CoursesModule } from './modules/courses/course.module';
+import { JobsModule } from './modules/jobs/job.module';
+import { AnnouncementsModule } from './modules/announcements/announcement.module';
 
 @Module({
   imports: [
@@ -79,6 +81,8 @@ import { CoursesModule } from './modules/courses/course.module';
     TestimonialsModule,
     TimelineModule,
     CoursesModule,
+    JobsModule,
+    AnnouncementsModule,
   ],
   controllers: [HealthController],
   providers: [
