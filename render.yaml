@@ -8,7 +8,8 @@ services:
     plan: free
     region: frankfurt
     buildCommand: npm install && npm run build
-    startCommand: npm run start:prod
+    # Cria o admin (se não existir) e arranca a API
+    startCommand: npm run seed:admin:prod && npm run start:prod
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
