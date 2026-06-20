@@ -24,6 +24,7 @@ import { PodcastModule } from './modules/podcast/podcast.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
 import { EventRegistrationsModule } from './modules/event-registrations/event-registration.module';
 import { RevMedModule } from './modules/revmed/revmed.module';
+import { DocumentsModule } from './modules/documents/document.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { RevMedModule } from './modules/revmed/revmed.module';
     GalleryModule,
     EventRegistrationsModule,
     RevMedModule,
+    DocumentsModule,
   ],
   controllers: [HealthController],
   providers: [
