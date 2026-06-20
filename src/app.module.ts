@@ -25,6 +25,9 @@ import { GalleryModule } from './modules/gallery/gallery.module';
 import { EventRegistrationsModule } from './modules/event-registrations/event-registration.module';
 import { RevMedModule } from './modules/revmed/revmed.module';
 import { DocumentsModule } from './modules/documents/document.module';
+import { FaqsModule } from './modules/faqs/faq.module';
+import { TestimonialsModule } from './modules/testimonials/testimonial.module';
+import { TimelineModule } from './modules/timeline/timeline.module';
 
 @Module({
   imports: [
@@ -71,6 +74,9 @@ import { DocumentsModule } from './modules/documents/document.module';
     EventRegistrationsModule,
     RevMedModule,
     DocumentsModule,
+    FaqsModule,
+    TestimonialsModule,
+    TimelineModule,
   ],
   controllers: [HealthController],
   providers: [

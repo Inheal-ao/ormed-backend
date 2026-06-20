@@ -12,6 +12,13 @@ import {
   BastonarioSchema,
   BastonarioDocument,
 } from '../bastonarios/schemas/bastonario.schema';
+import { Faq, FaqSchema, FaqDocument } from '../faqs/faq.module';
+import { Milestone, MilestoneSchema, MilestoneDocument } from '../timeline/timeline.module';
+import {
+  Testimonial,
+  TestimonialSchema,
+  TestimonialDocument,
+} from '../testimonials/testimonial.module';
 
 const DEFAULT_STATS = [
   { value: '35+', label: 'Anos de Existência', icon: 'Calendar', order: 1 },
@@ -43,6 +50,32 @@ const DEFAULT_BASTONARIOS = [
   { name: 'Dr. Carlos Alberto Mac', mandate: '1997 - 1998', isCurrent: false, order: 5, photo: { url: '/images/bastonario-mac-mahon.png', publicId: '' }, bio: 'Ex-Bastonário da Ordem dos Médicos de Angola.', quote: '' },
 ];
 
+const DEFAULT_FAQS = [
+  { question: 'Como posso inscrever-me na Ordem dos Médicos?', answer: 'Para se inscrever, necessita de apresentar o diploma de licenciatura em Medicina homologado, certificado de residência (se aplicável), fotografia tipo passe, e pagar a taxa de inscrição. Pode efetuar o processo online através da nossa plataforma digital.' },
+  { question: 'Qual a diferença entre a Ordem e o Sindicato dos Médicos?', answer: 'A Ordem dos Médicos regula o exercício profissional, garante a ética e deontologia médica, e atribui a carteira profissional. O Sindicato dos Médicos defende os interesses laborais e socioeconómicos dos médicos. São entidades distintas e complementares.' },
+  { question: 'Como renovar a minha inscrição?', answer: 'A renovação anual pode ser feita online na Área do Membro, mediante pagamento da quota anual. Receberá um lembrete 30 dias antes do vencimento.' },
+  { question: 'A ORMED emprega médicos?', answer: 'Não. A Ordem não é responsável pela empregabilidade dos médicos. A nossa função é regular o exercício da profissão, garantir a qualidade e a ética. Para questões laborais, contacte o Sindicato dos Médicos.' },
+  { question: 'Como apresentar uma denúncia?', answer: 'Pode apresentar uma denúncia através do nosso formulário online na secção "Denúncias", ou presencialmente na sede da ORMED. Toda a informação é tratada com confidencialidade.' },
+  { question: 'Quais as especialidades reconhecidas pela ORMED?', answer: 'A ORMED reconhece mais de 50 especialidades médicas, desde Medicina Geral e Familiar até especialidades cirúrgicas e de diagnóstico. Consulte a lista completa na secção "Especialidades".' },
+];
+
+const DEFAULT_TIMELINE = [
+  { year: '1991', title: 'Fundação da ORMED', description: 'Criação da Ordem dos Médicos de Angola como instituição de utilidade pública.', order: 0 },
+  { year: '1997', title: 'Primeira Bastonaria', description: 'Dr. Carlos Alberto Mac assume como primeiro Bastonário.', order: 1 },
+  { year: '2002', title: 'Expansão Nacional', description: 'Início da criação de delegações em todas as províncias de Angola.', order: 2 },
+  { year: '2010', title: 'Código Deontológico', description: 'Aprovação do primeiro Código Deontológico da medicina angolana.', order: 3 },
+  { year: '2015', title: 'Plataforma Digital', description: 'Lançamento do primeiro sistema de gestão online para médicos.', order: 4 },
+  { year: '2019', title: 'Parceria Internacional', description: 'Acordo de cooperação com a Ordem dos Médicos de Portugal e outras ordens internacionais.', order: 5 },
+  { year: '2025', title: 'Nova Era', description: 'Dra. Jovita André assume a Bastonaria, trazendo nova visão para a instituição.', order: 6 },
+];
+
+const DEFAULT_TESTIMONIALS = [
+  { name: 'Dr. António Silva', role: 'Médico Internista', location: 'Luanda', text: 'A ORMED tem sido fundamental para a minha carreira. A formação contínua e o apoio ético são incomparáveis.', order: 0 },
+  { name: 'Dra. Maria Fernandes', role: 'Pediatra', location: 'Benguela', text: 'Graças à ORMED, consegui especialização em Portugal com bolsa de estudo. A instituição realmente cuida dos seus membros.', order: 1 },
+  { name: 'Dr. Pedro Kiala', role: 'Cirurgião', location: 'Huambo', text: 'O sistema de prescrição eletrónica revolucionou a minha prática clínica. Excelente inovação da ORMED.', order: 2 },
+  { name: 'Dra. Ana Costa', role: 'Ginecologista', location: 'Lubango', text: 'A representação da ORMED junto do governo tem melhorado significativamente as condições de trabalho dos médicos.', order: 3 },
+];
+
 @Injectable()
 export class ContentSeederService implements OnApplicationBootstrap {
   private readonly logger = new Logger('ContentSeeder');
@@ -51,6 +84,9 @@ export class ContentSeederService implements OnApplicationBootstrap {
     @InjectModel(Stat.name) private readonly statModel: Model<StatDocument>,
     @InjectModel(Specialty.name) private readonly specialtyModel: Model<SpecialtyDocument>,
     @InjectModel(Bastonario.name) private readonly bastonarioModel: Model<BastonarioDocument>,
+    @InjectModel(Faq.name) private readonly faqModel: Model<FaqDocument>,
+    @InjectModel(Milestone.name) private readonly milestoneModel: Model<MilestoneDocument>,
+    @InjectModel(Testimonial.name) private readonly testimonialModel: Model<TestimonialDocument>,
   ) {}
 
   async onApplicationBootstrap() {
@@ -61,6 +97,9 @@ export class ContentSeederService implements OnApplicationBootstrap {
       DEFAULT_SPECIALTIES.map((name, i) => ({ name, order: i })),
     );
     await this.seedIfEmpty('bastonários', this.bastonarioModel, DEFAULT_BASTONARIOS);
+    await this.seedIfEmpty('FAQs', this.faqModel, DEFAULT_FAQS.map((f, i) => ({ ...f, order: i })));
+    await this.seedIfEmpty('cronologia', this.milestoneModel, DEFAULT_TIMELINE);
+    await this.seedIfEmpty('testemunhos', this.testimonialModel, DEFAULT_TESTIMONIALS);
   }
 
   private async seedIfEmpty(
@@ -85,6 +124,9 @@ export class ContentSeederService implements OnApplicationBootstrap {
       { name: Stat.name, schema: StatSchema },
       { name: Specialty.name, schema: SpecialtySchema },
       { name: Bastonario.name, schema: BastonarioSchema },
+      { name: Faq.name, schema: FaqSchema },
+      { name: Milestone.name, schema: MilestoneSchema },
+      { name: Testimonial.name, schema: TestimonialSchema },
     ]),
   ],
   providers: [ContentSeederService],
