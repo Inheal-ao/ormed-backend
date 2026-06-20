@@ -23,6 +23,7 @@ import { BooksModule } from './modules/books/book.module';
 import { PodcastModule } from './modules/podcast/podcast.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
 import { EventRegistrationsModule } from './modules/event-registrations/event-registration.module';
+import { RevMedModule } from './modules/revmed/revmed.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { EventRegistrationsModule } from './modules/event-registrations/event-re
     PodcastModule,
     GalleryModule,
     EventRegistrationsModule,
+    RevMedModule,
   ],
   controllers: [HealthController],
   providers: [
