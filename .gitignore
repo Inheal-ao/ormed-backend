@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*credentials*.env
+atlas-credentials.env
+*.log
+npm-debug.log*
+.DS_Store
+coverage/
+.idea/
+.vscode/
+*.tsbuildinfo
