@@ -1,7 +1,7 @@
 import { Module, Injectable, Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model } from 'mongoose';
-import { IsBoolean, IsDateString, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
 import { Asset, AssetSchema } from '../../common/schemas/asset.schema';
@@ -23,7 +23,9 @@ export class Announcement {
   @Prop({ default: 'Geral', trim: true }) category: string;
   @Prop({ default: '' }) content: string;
   @Prop({ type: AssetSchema, default: null }) coverImage: Asset | null;
-  @Prop({ type: AssetSchema, default: null }) pdf: Asset | null; // documento oficial
+  // Documentos partilhados como imagens (estilo galeria)
+  @Prop({ type: [AssetSchema], default: [] }) images: Asset[];
+  @Prop({ type: AssetSchema, default: null }) pdf: Asset | null; // opcional
   @Prop({ default: false, index: true }) isPublished: boolean;
   @Prop({ type: Date, default: null }) publishedAt: Date | null;
 }
@@ -35,6 +37,7 @@ class CreateAnnouncementDto {
   @IsOptional() @IsString() category?: string;
   @IsOptional() @IsString() content?: string;
   @IsOptional() @ValidateNested() @Type(() => AssetDto) coverImage?: AssetDto;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AssetDto) images?: AssetDto[];
   @IsOptional() @ValidateNested() @Type(() => AssetDto) pdf?: AssetDto;
   @IsOptional() @IsDateString() publishedAt?: string;
   @IsOptional() @IsBoolean() isPublished?: boolean;

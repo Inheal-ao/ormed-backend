@@ -31,6 +31,7 @@ import { TimelineModule } from './modules/timeline/timeline.module';
 import { CoursesModule } from './modules/courses/course.module';
 import { JobsModule } from './modules/jobs/job.module';
 import { AnnouncementsModule } from './modules/announcements/announcement.module';
+import { ResearchSupportModule } from './modules/research-support/research-support.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { AnnouncementsModule } from './modules/announcements/announcement.module
     CoursesModule,
     JobsModule,
     AnnouncementsModule,
+    ResearchSupportModule,
   ],
   controllers: [HealthController],
   providers: [
