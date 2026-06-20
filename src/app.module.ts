@@ -18,6 +18,10 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { SpecialtiesModule } from './modules/specialties/specialty.module';
 import { ContentSeederModule } from './modules/content-seeder/content-seeder.module';
+import { BulletinsModule } from './modules/bulletins/bulletin.module';
+import { BooksModule } from './modules/books/book.module';
+import { PodcastModule } from './modules/podcast/podcast.module';
+import { GalleryModule } from './modules/gallery/gallery.module';
 
 @Module({
   imports: [
@@ -57,6 +61,10 @@ import { ContentSeederModule } from './modules/content-seeder/content-seeder.mod
     StatsModule,
     SpecialtiesModule,
     ContentSeederModule,
+    BulletinsModule,
+    BooksModule,
+    PodcastModule,
+    GalleryModule,
   ],
   controllers: [HealthController],
   providers: [
