@@ -20,6 +20,10 @@ export class Bastonario {
   @Prop({ default: '' })
   bio: string;
 
+  // Citação/mensagem do bastonário (mostrada em destaque)
+  @Prop({ default: '' })
+  quote: string;
+
   // Indica o bastonário em exercício
   @Prop({ default: false })
   isCurrent: boolean;

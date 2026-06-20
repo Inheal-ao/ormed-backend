@@ -31,6 +31,10 @@ export class CreateBastonarioDto {
   bio?: string;
 
   @IsOptional()
+  @IsString()
+  quote?: string;
+
+  @IsOptional()
   @IsBoolean()
   isCurrent?: boolean;
 

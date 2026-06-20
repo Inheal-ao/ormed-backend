@@ -15,6 +15,9 @@ import { MagazinesModule } from './modules/magazines/magazines.module';
 import { BastonariosModule } from './modules/bastonarios/bastonarios.module';
 import { PartnersModule } from './modules/partners/partners.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { StatsModule } from './modules/stats/stats.module';
+import { SpecialtiesModule } from './modules/specialties/specialty.module';
+import { ContentSeederModule } from './modules/content-seeder/content-seeder.module';
 
 @Module({
   imports: [
@@ -51,6 +54,9 @@ import { SettingsModule } from './modules/settings/settings.module';
     BastonariosModule,
     PartnersModule,
     SettingsModule,
+    StatsModule,
+    SpecialtiesModule,
+    ContentSeederModule,
   ],
   controllers: [HealthController],
   providers: [
