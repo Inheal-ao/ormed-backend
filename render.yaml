@@ -8,8 +8,8 @@ services:
     plan: free
     region: frankfurt
     buildCommand: npm install && npm run build
-    # Cria o admin (se não existir) e arranca a API
-    startCommand: npm run seed:admin:prod && npm run start:prod
+    # O admin é criado automaticamente no arranque (AdminSeederService)
+    startCommand: npm run start:prod
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
