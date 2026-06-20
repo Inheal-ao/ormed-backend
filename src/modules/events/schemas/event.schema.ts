@@ -30,6 +30,25 @@ export class Event {
   @Prop({ type: Date, default: null })
   endDate: Date | null;
 
+  // Vagas (0 = ilimitadas)
+  @Prop({ default: 0 })
+  capacity: number;
+
+  // Preço em Kwanzas (0 = gratuito)
+  @Prop({ default: 0 })
+  price: number;
+
+  // Inscrições abertas?
+  @Prop({ default: true })
+  registrationOpen: boolean;
+
+  // 'internal' = formulário no site; 'external' = redireciona para link
+  @Prop({ default: 'internal', enum: ['internal', 'external'] })
+  registrationType: string;
+
+  @Prop({ default: '', trim: true })
+  externalLink: string;
+
   @Prop({ default: false, index: true })
   isPublished: boolean;
 }

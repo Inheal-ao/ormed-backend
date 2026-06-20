@@ -15,11 +15,13 @@ export class NewsService extends BaseCrudService<NewsDocument> {
 
   async createNews(dto: CreateNewsDto): Promise<NewsDocument> {
     const slug = await this.ensureUniqueSlug(dto.slug || slugify(dto.title));
-    return this.create({
-      ...dto,
-      slug,
-      publishedAt: dto.isPublished ? new Date() : null,
-    } as Partial<NewsDocument>);
+    // Data de publicação: a definida manualmente, ou a data atual se publicada
+    const publishedAt = dto.publishedAt
+      ? new Date(dto.publishedAt)
+      : dto.isPublished
+        ? new Date()
+        : null;
+    return this.create({ ...dto, slug, publishedAt } as Partial<NewsDocument>);
   }
 
   async updateNews(id: string, dto: UpdateNewsDto): Promise<NewsDocument> {
@@ -27,11 +29,11 @@ export class NewsService extends BaseCrudService<NewsDocument> {
     if (dto.slug || dto.title) {
       patch.slug = await this.ensureUniqueSlug(dto.slug || slugify(dto.title as string), id);
     }
-    if (dto.isPublished !== undefined) {
+    if (dto.publishedAt) {
+      patch.publishedAt = new Date(dto.publishedAt);
+    } else if (dto.isPublished !== undefined) {
       const current = await this.findOne(id);
-      patch.publishedAt = dto.isPublished
-        ? current.publishedAt ?? new Date()
-        : null;
+      patch.publishedAt = dto.isPublished ? current.publishedAt ?? new Date() : null;
     }
     return this.update(id, patch);
   }

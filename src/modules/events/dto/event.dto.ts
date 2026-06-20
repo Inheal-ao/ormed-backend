@@ -1,8 +1,11 @@
 import {
   IsBoolean,
   IsDateString,
+  IsIn,
+  IsInt,
   IsOptional,
   IsString,
+  Min,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -45,6 +48,30 @@ export class CreateEventDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  capacity?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  price?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  registrationOpen?: boolean;
+
+  @IsOptional()
+  @IsIn(['internal', 'external'])
+  registrationType?: string;
+
+  @IsOptional()
+  @IsString()
+  externalLink?: string;
 
   @IsOptional()
   @IsBoolean()

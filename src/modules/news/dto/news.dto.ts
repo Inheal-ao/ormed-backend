@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
   IsOptional,
   IsString,
   MaxLength,
@@ -23,6 +24,11 @@ export class CreateNewsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(300)
+  subtitle?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   excerpt?: string;
 
@@ -31,9 +37,24 @@ export class CreateNewsDto {
   content?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  source?: string;
+
+  @IsOptional()
+  @IsDateString()
+  publishedAt?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => AssetDto)
   coverImage?: AssetDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AssetDto)
+  images?: AssetDto[];
 
   @IsOptional()
   @IsString()

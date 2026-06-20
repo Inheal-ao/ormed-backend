@@ -22,6 +22,7 @@ import { BulletinsModule } from './modules/bulletins/bulletin.module';
 import { BooksModule } from './modules/books/book.module';
 import { PodcastModule } from './modules/podcast/podcast.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
+import { EventRegistrationsModule } from './modules/event-registrations/event-registration.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { GalleryModule } from './modules/gallery/gallery.module';
     BooksModule,
     PodcastModule,
     GalleryModule,
+    EventRegistrationsModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -12,6 +12,10 @@ export class News {
   @Prop({ required: true, unique: true, trim: true, index: true })
   slug: string;
 
+  // Subtítulo (hierarquia: título > subtítulo)
+  @Prop({ default: '', trim: true })
+  subtitle: string;
+
   @Prop({ default: '', trim: true })
   excerpt: string;
 
@@ -20,6 +24,14 @@ export class News {
 
   @Prop({ type: AssetSchema, default: null })
   coverImage: Asset | null;
+
+  // Galeria de fotos adicionais (carrossel)
+  @Prop({ type: [AssetSchema], default: [] })
+  images: Asset[];
+
+  // Fonte da notícia (ex.: "Jornal de Angola", URL, etc.)
+  @Prop({ default: '', trim: true })
+  source: string;
 
   @Prop({ default: 'Geral', trim: true, index: true })
   category: string;
