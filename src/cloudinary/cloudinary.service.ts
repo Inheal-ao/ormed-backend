@@ -53,9 +53,18 @@ export class CloudinaryService {
     folder: string,
     resourceType: 'image' | 'raw',
   ): Promise<UploadedAsset> {
+    // Para PDFs (raw), garantir que o public_id termina em ".pdf" para que
+    // o link entregue seja reconhecido pelo browser como um PDF.
+    const options: Record<string, unknown> = { folder, resource_type: resourceType };
+    if (resourceType === 'raw') {
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      options.public_id = `${unique}.pdf`;
+      options.use_filename = false;
+      options.unique_filename = false;
+    }
     return new Promise((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(
-        { folder, resource_type: resourceType },
+        options,
         (error, result?: UploadApiResponse) => {
           if (error || !result) {
             return reject(new BadRequestException('Falha no upload do ficheiro.'));
