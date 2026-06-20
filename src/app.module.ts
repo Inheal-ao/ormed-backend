@@ -32,6 +32,7 @@ import { CoursesModule } from './modules/courses/course.module';
 import { JobsModule } from './modules/jobs/job.module';
 import { AnnouncementsModule } from './modules/announcements/announcement.module';
 import { ResearchSupportModule } from './modules/research-support/research-support.module';
+import { AssistantModule } from './modules/assistant/assistant.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { ResearchSupportModule } from './modules/research-support/research-suppo
     JobsModule,
     AnnouncementsModule,
     ResearchSupportModule,
+    AssistantModule,
   ],
   controllers: [HealthController],
   providers: [
