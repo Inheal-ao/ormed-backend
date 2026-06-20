@@ -1,7 +1,7 @@
 import { Module, Injectable, Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model } from 'mongoose';
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
 import { Asset, AssetSchema } from '../../common/schemas/asset.schema';
@@ -23,7 +23,11 @@ export class Bulletin {
   @Prop({ default: '', trim: true }) edition: string;
   @Prop({ type: Number }) year: number;
   @Prop({ type: AssetSchema, default: null }) coverImage: Asset | null;
+  // Boletim pode ter várias imagens (estilo galeria/comunicados)
+  @Prop({ type: [AssetSchema], default: [] }) images: Asset[];
   @Prop({ type: AssetSchema, default: null }) pdf: Asset | null;
+  // Vídeo (link do YouTube/Vimeo, opcional)
+  @Prop({ default: '', trim: true }) videoUrl: string;
   @Prop({ default: false, index: true }) isPublished: boolean;
   @Prop({ type: Date, default: null }) publishedAt: Date | null;
 }
@@ -36,7 +40,9 @@ class CreateBulletinDto {
   @IsOptional() @IsString() edition?: string;
   @IsOptional() @Type(() => Number) @IsInt() year?: number;
   @IsOptional() @ValidateNested() @Type(() => AssetDto) coverImage?: AssetDto;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => AssetDto) images?: AssetDto[];
   @IsOptional() @ValidateNested() @Type(() => AssetDto) pdf?: AssetDto;
+  @IsOptional() @IsString() videoUrl?: string;
   @IsOptional() @IsBoolean() isPublished?: boolean;
 }
 class UpdateBulletinDto extends PartialType(CreateBulletinDto) {}
