@@ -5,6 +5,15 @@ dist/
 .env.*.local
 *credentials*.env
 atlas-credentials.env
+# Ficheiros de notas com segredos (nunca commitar)
+DADOS*.txt
+*DADOS*.txt
+*.secret.txt
+
+# Conteúdo (imagens/PDFs) — vai para Cloudinary, não para o repo de código
+NOTICIAS/
+conteudo/
+uploads-locais/
 *.log
 npm-debug.log*
 .DS_Store

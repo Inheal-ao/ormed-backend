@@ -7,6 +7,14 @@ import configuration, { validateEnv } from './config/configuration';
 import { HealthController } from './health.controller';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { NewsModule } from './modules/news/news.module';
+import { EventsModule } from './modules/events/events.module';
+import { MagazinesModule } from './modules/magazines/magazines.module';
+import { BastonariosModule } from './modules/bastonarios/bastonarios.module';
+import { PartnersModule } from './modules/partners/partners.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -35,6 +43,14 @@ import { UsersModule } from './users/users.module';
 
     AuthModule,
     UsersModule,
+    CloudinaryModule,
+    UploadsModule,
+    NewsModule,
+    EventsModule,
+    MagazinesModule,
+    BastonariosModule,
+    PartnersModule,
+    SettingsModule,
   ],
   controllers: [HealthController],
   providers: [
