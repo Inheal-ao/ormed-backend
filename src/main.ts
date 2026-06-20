@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { mongoSanitize } from './common/security/sanitize.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -12,8 +13,24 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  // ===== Segurança de cabeçalhos HTTP =====
-  app.use(helmet());
+  // Confiar no proxy do host (Render) para obter o IP real do cliente
+  // (essencial para o rate limiting funcionar por IP).
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+  // Esconde a tecnologia usada
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
+
+  // ===== Segurança de cabeçalhos HTTP (Helmet) =====
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // a API serve JSON; CSP é aplicada no frontend
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      hsts: { maxAge: 63072000, includeSubDomains: true, preload: true },
+    }),
+  );
+
+  // ===== Anti-injeção NoSQL =====
+  app.use(mongoSanitize);
 
   // ===== CORS restrito às origens conhecidas =====
   const corsOrigins = config.get<string[]>('corsOrigins') ?? [];
@@ -21,6 +38,7 @@ async function bootstrap() {
     origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    maxAge: 86400,
   });
 
   // ===== Prefixo global da API =====
@@ -36,7 +54,6 @@ async function bootstrap() {
     }),
   );
 
-  // Encerramento gracioso (fecha ligações ao MongoDB, etc.)
   app.enableShutdownHooks();
 
   const port = config.get<number>('port') ?? 4000;

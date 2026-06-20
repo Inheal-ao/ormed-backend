@@ -26,8 +26,10 @@ export abstract class BaseCrudService<T> {
     const filter: FilterQuery<T> = { ...baseFilter };
 
     if (search && this.searchableFields.length > 0) {
+      // Escapa metacaracteres de regex (evita ReDoS e injeção) e limita o tamanho
+      const safe = search.slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       (filter as Record<string, unknown>).$or = this.searchableFields.map((field) => ({
-        [field]: { $regex: search, $options: 'i' },
+        [field]: { $regex: safe, $options: 'i' },
       }));
     }
 
