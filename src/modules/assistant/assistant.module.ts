@@ -54,7 +54,7 @@ export class AssistantService {
           'O assistente ainda não está configurado. Por favor, contacte a equipa da ORMED.',
       };
     }
-    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     const contents: GeminiContent[] = dto.messages.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
