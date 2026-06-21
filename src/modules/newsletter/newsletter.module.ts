@@ -7,6 +7,7 @@ import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
+import { RequireCaptcha } from '../../common/captcha/captcha.module';
 
 export type SubscriberDocument = HydratedDocument<Subscriber>;
 
@@ -39,6 +40,7 @@ export class NewsletterController {
   constructor(private readonly s: NewsletterService) {}
 
   @Public()
+  @RequireCaptcha()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   subscribe(@Body() dto: SubscribeDto) { return this.s.subscribe(dto); }

@@ -15,6 +15,7 @@ import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
+import { RequireCaptcha } from '../../common/captcha/captcha.module';
 
 export type ComplaintDocument = HydratedDocument<Complaint>;
 
@@ -103,6 +104,7 @@ export class ComplaintsController {
   constructor(private readonly s: ComplaintsService) {}
 
   @Public()
+  @RequireCaptcha()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   @UseInterceptors(FilesInterceptor('attachments', 5))
