@@ -23,6 +23,8 @@ export class EventRegistration {
   @Prop({ required: true, trim: true }) name: string;
   @Prop({ required: true, trim: true, lowercase: true }) email: string;
   @Prop({ default: '', trim: true }) phone: string;
+  // Perfil: Médico, Estudante de Medicina, Outro profissional, Estudante de outro curso, Outro
+  @Prop({ default: '', trim: true }) profile: string;
   @Prop({ default: '', trim: true }) notes: string;
   @Prop({ type: [AssetSchema], default: [] }) attachments: Asset[]; // documentos pessoais
   @Prop({ type: AssetSchema, default: null }) paymentProof: Asset | null; // comprovativo
@@ -35,6 +37,7 @@ class RegisterDto {
   @IsString() @MinLength(2) @MaxLength(150) name: string;
   @IsEmail() email: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(80) profile?: string;
   @IsOptional() @IsString() @MaxLength(1000) notes?: string;
 }
 class UpdateStatusDto {
@@ -75,7 +78,8 @@ export class RegistrationsService {
 
     return this.model.create({
       event: new Types.ObjectId(eventId),
-      name: dto.name, email: dto.email, phone: dto.phone ?? '', notes: dto.notes ?? '',
+      name: dto.name, email: dto.email, phone: dto.phone ?? '',
+      profile: dto.profile ?? '', notes: dto.notes ?? '',
       attachments, paymentProof, status: 'pending',
     });
   }
@@ -136,10 +140,10 @@ export class RegistrationsController {
     const regs = await this.s.findByEvent(eventId);
     const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [
-      ['Nome', 'Email', 'Telefone', 'Estado', 'Comprovativo', 'Documentos', 'Data'].join(','),
+      ['Nome', 'Email', 'Telefone', 'Perfil', 'Estado', 'Comprovativo', 'Documentos', 'Data'].join(','),
       ...regs.map((r) =>
         [
-          esc(r.name), esc(r.email), esc(r.phone), esc(r.status),
+          esc(r.name), esc(r.email), esc(r.phone), esc(r.profile), esc(r.status),
           esc(r.paymentProof?.url ?? ''),
           esc((r.attachments ?? []).map((a) => a.url).join(' | ')),
           esc(new Date((r as any).createdAt).toLocaleString('pt-PT')),

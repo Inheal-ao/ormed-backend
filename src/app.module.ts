@@ -33,6 +33,8 @@ import { JobsModule } from './modules/jobs/job.module';
 import { AnnouncementsModule } from './modules/announcements/announcement.module';
 import { ResearchSupportModule } from './modules/research-support/research-support.module';
 import { AssistantModule } from './modules/assistant/assistant.module';
+import { ComplaintsModule } from './modules/complaints/complaint.module';
+import { NewsletterModule } from './modules/newsletter/newsletter.module';
 
 @Module({
   imports: [
@@ -87,6 +89,8 @@ import { AssistantModule } from './modules/assistant/assistant.module';
     AnnouncementsModule,
     ResearchSupportModule,
     AssistantModule,
+    ComplaintsModule,
+    NewsletterModule,
   ],
   controllers: [HealthController],
   providers: [
