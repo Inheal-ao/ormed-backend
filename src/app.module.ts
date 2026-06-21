@@ -40,6 +40,7 @@ import { ContactModule } from './modules/contact/contact.module';
 import { OrgaosModule } from './modules/orgaos/orgao.module';
 import { AccessCodesModule } from './modules/access-codes/access-code.module';
 import { UniversityListsModule } from './modules/university-lists/university-list.module';
+import { NotificationsModule } from './modules/notifications/notification.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { UniversityListsModule } from './modules/university-lists/university-lis
     OrgaosModule,
     AccessCodesModule,
     UniversityListsModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [
