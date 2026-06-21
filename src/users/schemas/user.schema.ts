@@ -42,10 +42,6 @@ export class User {
   @Prop({ default: '', trim: true })
   phone: string;
 
-  // Código de identidade de 6 dígitos (cifrado) — exigido em ações sensíveis. select:false
-  @Prop({ type: String, default: null, select: false })
-  identityCodeHash: string | null;
-
   @Prop({ default: true })
   isActive: boolean;
 

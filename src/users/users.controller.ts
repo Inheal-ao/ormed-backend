@@ -84,15 +84,14 @@ export class UsersController {
     return sanitize(u);
   }
 
-  /** Criar responsável de universidade — gera o código de identidade. */
+  /** Criar responsável de universidade. Os códigos de acesso geram-se à parte (bloco de 50). */
   @Post('universidade')
   async createUniversidade(@Body() dto: CreateUniversityDto) {
     const u = await this.users.create({
       name: dto.name, email: dto.email, password: dto.password, phone: dto.phone,
       role: UserRole.UNIVERSIDADE, universityName: dto.universityName, responsibleType: dto.responsibleType,
     });
-    const identityCode = await this.users.generateIdentityCode((u as any)._id.toString());
-    return { user: sanitize(u), identityCode };
+    return sanitize(u);
   }
 
   @Patch(':id')
@@ -110,17 +109,6 @@ export class UsersController {
     this.assertManage(actor, target.role);
     if ((target as any)._id.toString() === actor.userId) throw new BadRequestException('Não pode bloquear-se a si próprio.');
     return sanitize(await this.users.setBlocked(id, dto.blocked !== false));
-  }
-
-  /** Regenerar o código de identidade de uma universidade. */
-  @Post(':id/identity-code')
-  async regenCode(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    const target = await this.users.findById(id);
-    if (!target) throw new ForbiddenException('Utilizador não encontrado.');
-    this.assertManage(actor, target.role);
-    if (target.role !== UserRole.UNIVERSIDADE) throw new BadRequestException('Só universidades têm código de identidade.');
-    const identityCode = await this.users.generateIdentityCode(id);
-    return { identityCode };
   }
 
   @Post(':id/password')

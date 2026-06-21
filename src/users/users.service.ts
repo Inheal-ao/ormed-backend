@@ -2,13 +2,11 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
-  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { randomInt } from 'crypto';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
 
 const BCRYPT_ROUNDS = 12;
@@ -144,22 +142,4 @@ export class UsersService {
     if (!res) throw new NotFoundException('Utilizador não encontrado.');
   }
 
-  // ===== Código de identidade (6 dígitos) =====
-
-  /** Gera e guarda (cifrado) um novo código de identidade. Devolve o código em claro (uma vez). */
-  async generateIdentityCode(id: string): Promise<string> {
-    const user = await this.userModel.findById(id).exec();
-    if (!user) throw new NotFoundException('Utilizador não encontrado.');
-    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-    user.identityCodeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
-    await user.save();
-    return code;
-  }
-
-  /** Verifica o código de identidade do próprio utilizador. */
-  async verifyIdentityCode(id: string, code: string): Promise<boolean> {
-    const user = await this.userModel.findById(id).select('+identityCodeHash').exec();
-    if (!user || !user.identityCodeHash) return false;
-    return bcrypt.compare(String(code).trim(), user.identityCodeHash);
-  }
 }
