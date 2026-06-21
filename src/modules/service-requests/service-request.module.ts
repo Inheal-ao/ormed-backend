@@ -21,14 +21,16 @@ export type ServiceRequestDocument = HydratedDocument<ServiceRequest>;
 
 const SERVICE_TYPES = [
   'validacao-documentos',
+  'inscricao',
   'renovacao-inscricao',
   'carteira-profissional',
   'pagar-cotas',
   'declaracao',
 ];
-const PAID_TYPES = ['renovacao-inscricao', 'carteira-profissional', 'pagar-cotas', 'declaracao'];
+const PAID_TYPES = ['inscricao', 'renovacao-inscricao', 'carteira-profissional', 'pagar-cotas', 'declaracao'];
 const TYPE_PREFIX: Record<string, string> = {
   'validacao-documentos': 'VD',
+  'inscricao': 'IN',
   'renovacao-inscricao': 'RI',
   'carteira-profissional': 'CP',
   'pagar-cotas': 'CT',
