@@ -1,24 +1,28 @@
 import {
   Controller, Get, Post, Patch, Delete, Param, Body, Query, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
-import { IsArray, IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { UsersService } from './users.service';
 import { UserRole } from './schemas/user.schema';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 
+// Password forte obrigatória: mín. 8, com maiúscula, minúscula, número e símbolo.
+const STRONG_PW = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+const STRONG_PW_MSG = 'A password deve ter no mínimo 8 caracteres, incluindo maiúscula, minúscula, número e símbolo.';
+
 // ===== DTOs =====
 class CreateStaffDto {
   @IsString() @MinLength(2) @MaxLength(150) name: string;
   @IsEmail() email: string;
-  @IsString() @MinLength(8) @MaxLength(100) password: string;
+  @IsString() @MaxLength(100) @Matches(STRONG_PW,{message:STRONG_PW_MSG}) password: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) permissions?: string[];
 }
 class CreateUniversityDto {
   @IsString() @MinLength(2) @MaxLength(150) name: string;
   @IsEmail() email: string;
-  @IsString() @MinLength(8) @MaxLength(100) password: string;
+  @IsString() @MaxLength(100) @Matches(STRONG_PW,{message:STRONG_PW_MSG}) password: string;
   @IsString() @MinLength(2) @MaxLength(200) universityName: string;
   @IsIn(['reitor', 'decano']) responsibleType: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
@@ -34,7 +38,7 @@ class BlockDto {
   @IsOptional() blocked?: boolean;
 }
 class SetPasswordDto {
-  @IsString() @MinLength(8) @MaxLength(100) password: string;
+  @IsString() @MaxLength(100) @Matches(STRONG_PW,{message:STRONG_PW_MSG}) password: string;
 }
 
 function sanitize(u: any) {
@@ -134,7 +138,7 @@ export class UsersController {
 // ===== Perfil próprio (qualquer utilizador autenticado) =====
 class ChangePasswordDto {
   @IsString() @MinLength(1) currentPassword: string;
-  @IsString() @MinLength(8) @MaxLength(100) newPassword: string;
+  @IsString() @MaxLength(100) @Matches(STRONG_PW,{message:STRONG_PW_MSG}) newPassword: string;
 }
 
 @Controller('profile')

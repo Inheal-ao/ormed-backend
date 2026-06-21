@@ -9,6 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { PermissionsGuard } from './guards/permissions.guard';
 
 @Module({
   imports: [UsersModule, PassportModule, JwtModule.register({})],
@@ -21,6 +22,8 @@ import { RolesGuard } from './guards/roles.guard';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     // Guard de papéis global: aplica-se onde houver @Roles()
     { provide: APP_GUARD, useClass: RolesGuard },
+    // Guard de permissões: restringe funcionários às secções permitidas
+    { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })
 export class AuthModule {}

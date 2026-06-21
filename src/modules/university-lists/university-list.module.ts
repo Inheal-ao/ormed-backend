@@ -1,5 +1,5 @@
 import {
-  Module, Injectable, Controller, Get, Post, Body,
+  Module, Injectable, Controller, Post, Param, Body,
   UseInterceptors, UploadedFiles, BadRequestException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -29,6 +29,10 @@ export class UniversityList {
   @Prop({ default: '', trim: true }) notes: string;
   @Prop({ default: '', trim: true }) submittedBy: string;
   @Prop({ default: 'recebida', enum: ['recebida', 'em-verificacao', 'arquivada'], index: true }) status: string;
+  // Rastreio de visualização (o reitor sabe se a Ordem viu)
+  @Prop({ type: Date, default: null }) lastViewedAt: Date | null;
+  @Prop({ default: '' }) lastViewedByName: string;
+  @Prop({ default: 0 }) viewCount: number;
 }
 export const UniversityListSchema = SchemaFactory.createForClass(UniversityList);
 
@@ -89,6 +93,16 @@ export class UniversityListsService {
     }
     return this.model.find().sort({ createdAt: -1 }).exec();
   }
+
+  /** Regista que uma lista específica foi vista pela Ordem (reitor passa a saber). */
+  async markSeen(actor: AuthUser, id: string) {
+    const me = await this.users.findById(actor.userId);
+    return this.model.findByIdAndUpdate(
+      id,
+      { lastViewedAt: new Date(), lastViewedByName: me?.name ?? 'Ordem', $inc: { viewCount: 1 } },
+      { new: true },
+    ).exec();
+  }
 }
 
 @Controller('university-lists')
@@ -116,6 +130,13 @@ export class UniversityListsController {
   @Post('admin/view')
   all(@Body() dto: AdminViewDto, @CurrentUser() actor: AuthUser) {
     return this.s.adminView(actor, dto.code);
+  }
+
+  /** Marca uma lista como vista pela Ordem (chamado ao abrir os documentos). */
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
+  @Post('admin/:id/seen')
+  seen(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.s.markSeen(actor, id);
   }
 }
 
