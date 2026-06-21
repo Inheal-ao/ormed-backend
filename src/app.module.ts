@@ -35,6 +35,7 @@ import { ResearchSupportModule } from './modules/research-support/research-suppo
 import { AssistantModule } from './modules/assistant/assistant.module';
 import { ComplaintsModule } from './modules/complaints/complaint.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
+import { ServiceRequestsModule } from './modules/service-requests/service-request.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { NewsletterModule } from './modules/newsletter/newsletter.module';
     AssistantModule,
     ComplaintsModule,
     NewsletterModule,
+    ServiceRequestsModule,
   ],
   controllers: [HealthController],
   providers: [
