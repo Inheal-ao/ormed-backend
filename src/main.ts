@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -41,8 +41,10 @@ async function bootstrap() {
     maxAge: 86400,
   });
 
-  // ===== Prefixo global da API =====
-  app.setGlobalPrefix('api');
+  // ===== Prefixo global da API (raiz "/" fica de fora, para monitorização) =====
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: '/', method: RequestMethod.GET }],
+  });
 
   // ===== Validação e sanitização automática de DTOs =====
   app.useGlobalPipes(
