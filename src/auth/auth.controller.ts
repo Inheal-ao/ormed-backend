@@ -57,6 +57,9 @@ export class AuthController {
       name: user?.name,
       email: user?.email,
       role: user?.role,
+      permissions: user?.permissions ?? [],
+      universityName: user?.universityName ?? '',
+      responsibleType: user?.responsibleType ?? '',
       lastLoginAt: user?.lastLoginAt,
     };
   }
