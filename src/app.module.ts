@@ -37,6 +37,7 @@ import { ComplaintsModule } from './modules/complaints/complaint.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { ServiceRequestsModule } from './modules/service-requests/service-request.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { OrgaosModule } from './modules/orgaos/orgao.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { ContactModule } from './modules/contact/contact.module';
     NewsletterModule,
     ServiceRequestsModule,
     ContactModule,
+    OrgaosModule,
   ],
   controllers: [HealthController],
   providers: [
