@@ -1,5 +1,5 @@
 import {
-  Module, Injectable, Controller, Get, Post, Patch, Delete, Param, Body, Query,
+  Module, Injectable, Controller, Get, Post, Patch, Param, Body, Query,
   UseInterceptors, UploadedFiles, UploadedFile, Res, NotFoundException, BadRequestException,
 } from '@nestjs/common';
 import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
@@ -14,7 +14,8 @@ import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '../../users/schemas/user.schema';
+import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
+import { User, UserSchema, UserRole } from '../../users/schemas/user.schema';
 
 export type ServiceRequestDocument = HydratedDocument<ServiceRequest>;
 
@@ -57,6 +58,12 @@ export class ServiceRequest {
   @Prop({ type: AssetSchema, default: null }) paymentProof: Asset | null; // comprovativo do user
   @Prop({ type: AssetSchema, default: null }) receipt: Asset | null; // recibo emitido pelo operador
   @Prop({ default: '', trim: true }) adminNotes: string;
+  // Histórico de etapas (quem fez o quê e quando)
+  @Prop({
+    type: [{ at: Date, by: String, action: String, status: String }],
+    default: [],
+  })
+  history: { at: Date; by: string; action: string; status: string }[];
 }
 export const ServiceRequestSchema = SchemaFactory.createForClass(ServiceRequest);
 
@@ -95,8 +102,20 @@ function randomCode(len = 6): string {
 export class ServiceRequestsService {
   constructor(
     @InjectModel(ServiceRequest.name) private readonly model: Model<ServiceRequestDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<any>,
     private readonly cloudinary: CloudinaryService,
   ) {}
+
+  /** Resolve o nome do operador a partir do JWT (cai para o email). */
+  private async operatorName(user?: AuthUser): Promise<string> {
+    if (!user) return 'Sistema';
+    try {
+      const u = (await this.userModel.findById(user.userId).select('name email').lean().exec()) as any;
+      return (u?.name as string) || (u?.email as string) || user.email || 'Operador';
+    } catch {
+      return user.email || 'Operador';
+    }
+  }
 
   private async uploadFiles(files: Express.Multer.File[]): Promise<Asset[]> {
     const out: Asset[] = [];
@@ -137,6 +156,7 @@ export class ServiceRequestsService {
       attachments,
       isPaid: PAID_TYPES.includes(dto.serviceType),
       status: 'recebido',
+      history: [{ at: new Date(), by: 'Utilizador (site)', action: 'Solicitação submetida', status: 'recebido' }],
     });
     return { serviceCode: doc.serviceCode };
   }
@@ -161,6 +181,8 @@ export class ServiceRequestsService {
       receiptUrl: d.receipt?.url ?? null,
       canSubmitProof,
       createdAt: (d as any).createdAt,
+      // Linha do tempo pública (sem nomes de operadores)
+      timeline: (d.history ?? []).map((h) => ({ at: h.at, action: h.action, status: h.status })),
     };
   }
 
@@ -197,6 +219,7 @@ export class ServiceRequestsService {
     const [asset] = await this.uploadFiles([file]);
     d.paymentProof = asset;
     d.status = 'pagamento-em-analise';
+    d.history.push({ at: new Date(), by: 'Utilizador (site)', action: 'Comprovativo enviado', status: 'pagamento-em-analise' });
     await d.save();
     return this.publicView(d);
   }
@@ -208,23 +231,41 @@ export class ServiceRequestsService {
     if (status) filter.status = status;
     return this.model.find(filter).sort({ createdAt: -1 }).exec();
   }
-  updateStatus(id: string, dto: UpdateStatusDto) {
-    return this.model.findByIdAndUpdate(id, dto, { new: true }).exec();
+  async updateStatus(id: string, dto: UpdateStatusDto, user?: AuthUser) {
+    const d = await this.model.findById(id).exec();
+    if (!d) throw new NotFoundException('Solicitação não encontrada.');
+    const by = await this.operatorName(user);
+    d.status = dto.status;
+    if (dto.statusDetail !== undefined) d.statusDetail = dto.statusDetail;
+    if (dto.adminNotes !== undefined) d.adminNotes = dto.adminNotes;
+    d.history.push({ at: new Date(), by, action: dto.statusDetail ? `Estado atualizado — ${dto.statusDetail}` : 'Estado atualizado', status: dto.status });
+    await d.save();
+    return d;
   }
-  setPayment(id: string, dto: SetPaymentDto) {
-    return this.model.findByIdAndUpdate(
-      id,
-      { paymentAmount: dto.paymentAmount, paymentInstructions: dto.paymentInstructions, status: 'aguarda-pagamento' },
-      { new: true },
-    ).exec();
+
+  async setPayment(id: string, dto: SetPaymentDto, user?: AuthUser) {
+    const d = await this.model.findById(id).exec();
+    if (!d) throw new NotFoundException('Solicitação não encontrada.');
+    const by = await this.operatorName(user);
+    d.paymentAmount = dto.paymentAmount;
+    d.paymentInstructions = dto.paymentInstructions;
+    d.status = 'aguarda-pagamento';
+    d.history.push({ at: new Date(), by, action: `Pagamento definido${dto.paymentAmount ? ' — ' + dto.paymentAmount : ''}`, status: 'aguarda-pagamento' });
+    await d.save();
+    return d;
   }
-  async uploadReceipt(id: string, file: Express.Multer.File) {
+
+  async uploadReceipt(id: string, file: Express.Multer.File, user?: AuthUser) {
     if (!file) throw new BadRequestException('Anexe o recibo.');
+    const d = await this.model.findById(id).exec();
+    if (!d) throw new NotFoundException('Solicitação não encontrada.');
+    const by = await this.operatorName(user);
     const [asset] = await this.uploadFiles([file]);
-    return this.model.findByIdAndUpdate(id, { receipt: asset, status: 'recibo-emitido' }, { new: true }).exec();
-  }
-  remove(id: string) {
-    return this.model.findByIdAndDelete(id).exec();
+    d.receipt = asset;
+    d.status = 'recibo-emitido';
+    d.history.push({ at: new Date(), by, action: 'Recibo emitido', status: 'recibo-emitido' });
+    await d.save();
+    return d;
   }
 }
 
@@ -272,27 +313,21 @@ export class ServiceRequestsController {
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
   @Patch(':id/status')
-  status(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
-    return this.s.updateStatus(id, dto);
+  status(@Param('id') id: string, @Body() dto: UpdateStatusDto, @CurrentUser() user: AuthUser) {
+    return this.s.updateStatus(id, dto, user);
   }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
   @Patch(':id/payment')
-  payment(@Param('id') id: string, @Body() dto: SetPaymentDto) {
-    return this.s.setPayment(id, dto);
+  payment(@Param('id') id: string, @Body() dto: SetPaymentDto, @CurrentUser() user: AuthUser) {
+    return this.s.setPayment(id, dto, user);
   }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
   @Post(':id/receipt')
   @UseInterceptors(FileInterceptor('receipt'))
-  receipt(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    return this.s.uploadReceipt(id, file);
-  }
-
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.s.remove(id);
+  receipt(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: AuthUser) {
+    return this.s.uploadReceipt(id, file, user);
   }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
@@ -320,7 +355,10 @@ export class ServiceRequestsController {
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: ServiceRequest.name, schema: ServiceRequestSchema }]),
+    MongooseModule.forFeature([
+      { name: ServiceRequest.name, schema: ServiceRequestSchema },
+      { name: User.name, schema: UserSchema },
+    ]),
     CloudinaryModule,
   ],
   controllers: [ServiceRequestsController],
