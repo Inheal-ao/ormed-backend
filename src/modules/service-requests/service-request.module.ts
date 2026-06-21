@@ -51,6 +51,7 @@ export class ServiceRequest {
   @Prop({ default: '', trim: true, lowercase: true }) email: string;
   @Prop({ required: true, trim: true }) phone: string;
   @Prop({ type: [AssetSchema], default: [] }) attachments: Asset[];
+  @Prop({ default: '' }) details: string; // dados do formulário (ex.: inscrição)
   @Prop({ default: false }) isPaid: boolean;
   @Prop({ default: 'recebido', index: true }) status: string;
   @Prop({ default: '', trim: true }) statusDetail: string; // motivo / nota do operador
@@ -77,6 +78,7 @@ class CreateServiceRequestDto {
   @IsOptional() @IsString() @MaxLength(200) institution?: string;
   @IsOptional() @IsString() @MaxLength(150) email?: string;
   @IsString() @MinLength(6) @MaxLength(40) phone: string;
+  @IsOptional() @IsString() @MaxLength(8000) details?: string;
 }
 class RecoverDto {
   @IsString() @MinLength(2) @MaxLength(150) ownerName: string;
@@ -155,6 +157,7 @@ export class ServiceRequestsService {
       institution: dto.institution ?? '',
       email: dto.email ?? '',
       phone: dto.phone,
+      details: dto.details ?? '',
       attachments,
       isPaid: PAID_TYPES.includes(dto.serviceType),
       status: 'recebido',
