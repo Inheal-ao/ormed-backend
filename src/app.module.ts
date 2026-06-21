@@ -41,6 +41,7 @@ import { OrgaosModule } from './modules/orgaos/orgao.module';
 import { AccessCodesModule } from './modules/access-codes/access-code.module';
 import { UniversityListsModule } from './modules/university-lists/university-list.module';
 import { NotificationsModule } from './modules/notifications/notification.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { NotificationsModule } from './modules/notifications/notification.module
     AccessCodesModule,
     UniversityListsModule,
     NotificationsModule,
+    AuditModule,
   ],
   controllers: [HealthController],
   providers: [
