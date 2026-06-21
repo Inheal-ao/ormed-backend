@@ -38,6 +38,7 @@ import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { ServiceRequestsModule } from './modules/service-requests/service-request.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { OrgaosModule } from './modules/orgaos/orgao.module';
+import { UniversityListsModule } from './modules/university-lists/university-list.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { OrgaosModule } from './modules/orgaos/orgao.module';
     ServiceRequestsModule,
     ContactModule,
     OrgaosModule,
+    UniversityListsModule,
   ],
   controllers: [HealthController],
   providers: [

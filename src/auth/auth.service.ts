@@ -10,7 +10,10 @@ export interface AuthTokens {
 }
 
 export interface AuthResult extends AuthTokens {
-  user: { id: string; name: string; email: string; role: string };
+  user: {
+    id: string; name: string; email: string; role: string;
+    permissions: string[]; universityName: string; responsibleType: string;
+  };
 }
 
 @Injectable()
@@ -26,7 +29,7 @@ export class AuthService {
     const user = await this.usersService.findByEmailWithSecret(email);
 
     // Mensagem genérica para não revelar se o email existe.
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.isBlocked) {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
@@ -49,7 +52,12 @@ export class AuthService {
 
     return {
       ...tokens,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user.id, name: user.name, email: user.email, role: user.role,
+        permissions: user.permissions ?? [],
+        universityName: user.universityName ?? '',
+        responsibleType: user.responsibleType ?? '',
+      },
     };
   }
 

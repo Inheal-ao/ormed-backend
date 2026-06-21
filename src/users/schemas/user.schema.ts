@@ -3,11 +3,14 @@ import { HydratedDocument } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
 
-/** Níveis de acesso do painel admin. */
+/** Perfis de acesso da plataforma. */
 export enum UserRole {
-  SUPER_ADMIN = 'super_admin', // controlo total, incluindo gestão de outros admins
-  ADMIN = 'admin', // gestão de todo o conteúdo
-  EDITOR = 'editor', // criação/edição de conteúdo, sem gestão de utilizadores
+  SUPER_ADMIN = 'super_admin', // Admin "deus" — todos os acessos, cria bastonárias
+  ADMIN = 'admin', // legado (acesso elevado)
+  EDITOR = 'editor', // legado
+  BASTONARIA = 'bastonaria', // acesso total + gere funcionários e universidades
+  FUNCIONARIO = 'funcionario', // acesso às secções permitidas
+  UNIVERSIDADE = 'universidade', // só o portal de listas de finalistas
 }
 
 @Schema({ timestamps: true })
@@ -22,15 +25,33 @@ export class User {
   @Prop({ required: true, select: false })
   passwordHash: string;
 
-  @Prop({
-    type: String,
-    enum: UserRole,
-    default: UserRole.EDITOR,
-  })
+  @Prop({ type: String, enum: UserRole, default: UserRole.FUNCIONARIO })
   role: UserRole;
+
+  // Funcionário: secções do painel a que tem acesso (ex.: 'noticias', 'eventos').
+  @Prop({ type: [String], default: [] })
+  permissions: string[];
+
+  // Universidade: dados do responsável.
+  @Prop({ default: '', trim: true })
+  universityName: string;
+
+  @Prop({ default: '', trim: true })
+  responsibleType: string; // 'reitor' | 'decano'
+
+  @Prop({ default: '', trim: true })
+  phone: string;
+
+  // Código de identidade de 6 dígitos (cifrado) — exigido em ações sensíveis. select:false
+  @Prop({ type: String, default: null, select: false })
+  identityCodeHash: string | null;
 
   @Prop({ default: true })
   isActive: boolean;
+
+  // Bloqueio sem eliminar (impede login).
+  @Prop({ default: false })
+  isBlocked: boolean;
 
   @Prop({ type: Date, default: null })
   lastLoginAt: Date | null;

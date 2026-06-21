@@ -23,7 +23,18 @@ export class RolesGuard implements CanActivate {
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
     const { user } = context.switchToHttp().getRequest<{ user: AuthUser }>();
-    if (!user || !requiredRoles.includes(user.role as UserRole)) {
+    if (!user) {
+      throw new ForbiddenException('Não tem permissões para esta ação.');
+    }
+    // Acesso total: Admin (deus) e Bastonária passam em qualquer verificação de papel.
+    if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.BASTONARIA) {
+      return true;
+    }
+    // Funcionário é equivalente a Editor nas rotas de conteúdo (limitação fina via menu).
+    if (user.role === UserRole.FUNCIONARIO && requiredRoles.includes(UserRole.EDITOR)) {
+      return true;
+    }
+    if (!requiredRoles.includes(user.role as UserRole)) {
       throw new ForbiddenException('Não tem permissões para esta ação.');
     }
     return true;
