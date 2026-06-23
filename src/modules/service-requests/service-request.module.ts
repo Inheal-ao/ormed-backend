@@ -16,7 +16,6 @@ import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
 import { User, UserSchema, UserRole } from '../../users/schemas/user.schema';
-import { RequireCaptcha } from '../../common/captcha/captcha.module';
 
 export type ServiceRequestDocument = HydratedDocument<ServiceRequest>;
 
@@ -281,7 +280,6 @@ export class ServiceRequestsController {
 
   // ---- Público ----
   @Public()
-  @RequireCaptcha()
   @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @Post()
   @UseInterceptors(FilesInterceptor('attachments', 8))

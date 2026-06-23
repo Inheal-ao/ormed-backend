@@ -42,7 +42,6 @@ import { AccessCodesModule } from './modules/access-codes/access-code.module';
 import { UniversityListsModule } from './modules/university-lists/university-list.module';
 import { NotificationsModule } from './modules/notifications/notification.module';
 import { AuditModule } from './modules/audit/audit.module';
-import { CaptchaModule } from './common/captcha/captcha.module';
 
 @Module({
   imports: [
@@ -106,7 +105,6 @@ import { CaptchaModule } from './common/captcha/captcha.module';
     UniversityListsModule,
     NotificationsModule,
     AuditModule,
-    CaptchaModule,
   ],
   controllers: [HealthController],
   providers: [

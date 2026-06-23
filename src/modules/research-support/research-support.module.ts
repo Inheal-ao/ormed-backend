@@ -9,7 +9,6 @@ import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
-import { RequireCaptcha } from '../../common/captcha/captcha.module';
 
 export type SupportDocument = HydratedDocument<ResearchSupport>;
 
@@ -50,7 +49,6 @@ export class ResearchSupportController {
   constructor(private readonly s: ResearchSupportService) {}
 
   @Public()
-  @RequireCaptcha()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   create(@Body() dto: CreateSupportDto) { return this.s.create(dto); }

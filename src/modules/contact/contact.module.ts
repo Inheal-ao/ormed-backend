@@ -7,7 +7,6 @@ import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-valid
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
-import { RequireCaptcha } from '../../common/captcha/captcha.module';
 
 export type ContactMessageDocument = HydratedDocument<ContactMessage>;
 
@@ -44,7 +43,6 @@ export class ContactController {
   constructor(private readonly s: ContactService) {}
 
   @Public()
-  @RequireCaptcha()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   async create(@Body() dto: CreateContactDto) {
