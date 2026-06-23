@@ -42,6 +42,7 @@ import { AccessCodesModule } from './modules/access-codes/access-code.module';
 import { UniversityListsModule } from './modules/university-lists/university-list.module';
 import { NotificationsModule } from './modules/notifications/notification.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { MembersModule } from './modules/members/member.module';
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { AuditModule } from './modules/audit/audit.module';
     UniversityListsModule,
     NotificationsModule,
     AuditModule,
+    MembersModule,
   ],
   controllers: [HealthController],
   providers: [

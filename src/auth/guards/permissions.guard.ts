@@ -35,6 +35,7 @@ const CONTENT_MAP: Record<string, string[]> = {
   testimonials: ['testemunhos'],
   timeline: ['cronologia'],
   settings: ['definicoes'],
+  members: ['membros'],
 };
 
 function sectionFor(path: string): string[] | null {
