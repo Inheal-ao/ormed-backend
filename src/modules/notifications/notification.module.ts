@@ -12,6 +12,7 @@ import { ContactMessage, ContactMessageSchema } from '../contact/contact.module'
 import { EventRegistration, RegistrationSchema } from '../event-registrations/event-registration.module';
 import { ResearchSupport, SupportSchema } from '../research-support/research-support.module';
 import { UniversityList, UniversityListSchema } from '../university-lists/university-list.module';
+import { MembersModule, MembersService } from '../members/member.module';
 
 const SR_TERMINAL = ['concluido', 'rejeitado', 'nao-validado'];
 const PAID_TYPES = ['inscricao', 'renovacao-inscricao', 'carteira-profissional', 'pagar-cotas', 'declaracao'];
@@ -37,6 +38,7 @@ export class NotificationsService {
     @InjectModel(ResearchSupport.name) private readonly research: Model<any>,
     @InjectModel(UniversityList.name) private readonly lists: Model<any>,
     private readonly users: UsersService,
+    private readonly membersService: MembersService,
   ) {}
 
   /** Determina que categorias o utilizador pode ver. */
@@ -55,9 +57,10 @@ export class NotificationsService {
   async summary(actor: AuthUser) {
     const allowed = await this.allowedCategories(actor);
     const can = (c: string) => allowed.has(c);
+    const isManager = [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.BASTONARIA].includes(actor.role as UserRole);
     const active = { status: { $nin: SR_TERMINAL } };
     const z = Promise.resolve(0);
-    const [validacoes, solicitacoes, denuncias, mensagens, inscricoes, apoioPesquisa, listas] = await Promise.all([
+    const [validacoes, solicitacoes, denuncias, mensagens, inscricoes, apoioPesquisa, listas, aprovacoes] = await Promise.all([
       can('validacoes') ? this.sr.countDocuments({ ...active, serviceType: 'validacao-documentos' }) : z,
       can('solicitacoes') ? this.sr.countDocuments({ ...active, serviceType: { $in: PAID_TYPES } }) : z,
       can('denuncias') ? this.complaints.countDocuments({ status: { $ne: 'resolved' } }) : z,
@@ -65,9 +68,10 @@ export class NotificationsService {
       can('inscricoes') ? this.regs.countDocuments({ status: 'pending' }) : z,
       can('apoioPesquisa') ? this.research.countDocuments({ status: 'new' }) : z,
       can('listas') ? this.lists.countDocuments({ lastViewedAt: null }) : z,
+      isManager ? this.membersService.countPendingApprovals() : z,
     ]);
 
-    const counts = { validacoes, solicitacoes, denuncias, mensagens, inscricoes, apoioPesquisa, listas };
+    const counts = { validacoes, solicitacoes, denuncias, mensagens, inscricoes, apoioPesquisa, listas, aprovacoes };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
     // Operações em curso / pendentes recentes (só as categorias permitidas)
@@ -119,6 +123,7 @@ export class NotificationsController {
       { name: UniversityList.name, schema: UniversityListSchema },
     ]),
     UsersModule,
+    MembersModule,
   ],
   controllers: [NotificationsController],
   providers: [NotificationsService],

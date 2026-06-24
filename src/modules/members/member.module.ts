@@ -10,10 +10,14 @@ import { randomInt } from 'crypto';
 import { IsArray, IsEmail, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
+import { UsersModule } from '../../users/users.module';
+import { UsersService } from '../../users/users.service';
 
 export type MemberDocument = HydratedDocument<Member>;
 export type ChangeRequestDocument = HydratedDocument<MemberChangeRequest>;
+export type CategoryRequestDocument = HydratedDocument<CategoryRequest>;
 
 const EDITABLE = ['name', 'phone', 'email', 'especialidade', 'provincia', 'residencia'] as const;
 
@@ -63,6 +67,21 @@ export class MemberChangeRequest {
 }
 export const ChangeRequestSchema = SchemaFactory.createForClass(MemberChangeRequest);
 
+/** Pedido de atribuição de categoria (interno/especialista/orientador) — carece de aprovação da Bastonária. */
+@Schema({ timestamps: true })
+export class CategoryRequest {
+  @Prop({ type: Types.ObjectId, ref: 'Member', required: true, index: true }) member: Types.ObjectId;
+  @Prop({ required: true }) memberName: string;
+  @Prop({ default: '' }) numeroOrdem: string;
+  @Prop({ required: true, enum: ['interno', 'especialista', 'orientador'] }) categoria: string;
+  @Prop({ default: 'add', enum: ['add', 'remove'] }) action: string;
+  @Prop({ default: '' }) collegeId: string; // colégio de origem
+  @Prop({ default: '' }) requestedByRole: string; // quem solicitou
+  @Prop({ default: 'pending', enum: ['pending', 'approved', 'rejected'], index: true }) status: string;
+  @Prop({ default: '' }) adminNotes: string;
+}
+export const CategoryRequestSchema = SchemaFactory.createForClass(CategoryRequest);
+
 // ===== DTOs =====
 class CreateMemberDto {
   @IsString() @MinLength(3) @MaxLength(150) name: string;
@@ -108,6 +127,12 @@ class ResolveDto {
   @IsString() status: string; // approved | rejected
   @IsOptional() @IsString() @MaxLength(1000) adminNotes?: string;
 }
+class CategoryReqDto {
+  @IsString() memberId: string;
+  @IsIn(['interno', 'especialista', 'orientador']) categoria: string;
+  @IsOptional() @IsIn(['add', 'remove']) action?: string;
+  @IsOptional() @IsString() @MaxLength(60) collegeId?: string;
+}
 
 @Injectable()
 export class MembersService implements OnApplicationBootstrap {
@@ -115,6 +140,8 @@ export class MembersService implements OnApplicationBootstrap {
   constructor(
     @InjectModel(Member.name) private readonly model: Model<MemberDocument>,
     @InjectModel(MemberChangeRequest.name) private readonly reqModel: Model<ChangeRequestDocument>,
+    @InjectModel(CategoryRequest.name) private readonly catModel: Model<CategoryRequestDocument>,
+    private readonly users: UsersService,
   ) {}
 
   /** Banco de médicos simulado para testes — substituível por médicos reais. */
@@ -275,6 +302,82 @@ export class MembersService implements OnApplicationBootstrap {
     await r.save();
     return r;
   }
+
+  // ===== Atribuições de categoria (carecem de aprovação da Bastonária) =====
+
+  /** Coordenador (ou gestor) solicita uma categoria para um médico. */
+  async requestCategory(actor: AuthUser, dto: CategoryReqDto) {
+    const member = await this.model.findById(dto.memberId).exec();
+    if (!member) throw new NotFoundException('Médico não encontrado no banco da Ordem.');
+    const action = dto.action ?? 'add';
+    const cats = member.categorias ?? [];
+
+    if (action === 'add' && cats.includes(dto.categoria)) {
+      throw new BadRequestException('O médico já tem esta categoria.');
+    }
+    if (action === 'remove' && !cats.includes(dto.categoria)) {
+      throw new BadRequestException('O médico não tem esta categoria.');
+    }
+    // Regra: só especialistas podem ser orientadores.
+    if (action === 'add' && dto.categoria === 'orientador' && !cats.includes('especialista')) {
+      throw new BadRequestException('Só médicos especialistas podem ser orientadores. Atribua primeiro a categoria de Especialista.');
+    }
+    // Evita pedidos duplicados pendentes.
+    const dup = await this.catModel.exists({ member: member._id, categoria: dto.categoria, action, status: 'pending' });
+    if (dup) throw new BadRequestException('Já existe um pedido pendente para esta categoria.');
+
+    let collegeId = dto.collegeId ?? '';
+    if (actor.role === UserRole.COLEGIO) {
+      const u = await this.users.findById(actor.userId);
+      collegeId = (u as any)?.collegeId || '';
+    }
+    await this.catModel.create({
+      member: member._id, memberName: member.name, numeroOrdem: member.numeroOrdem,
+      categoria: dto.categoria, action, collegeId, requestedByRole: actor.role, status: 'pending',
+    });
+    return { ok: true };
+  }
+
+  listCategoryRequests(status?: string) {
+    const filter = status ? { status } : {};
+    return this.catModel.find(filter).sort({ createdAt: -1 }).limit(300).exec();
+  }
+  countPendingCategoryRequests() { return this.catModel.countDocuments({ status: 'pending' }).exec(); }
+  countPendingChangeRequests() { return this.reqModel.countDocuments({ status: 'pending' }).exec(); }
+  async countPendingApprovals() {
+    const [a, b] = await Promise.all([this.countPendingCategoryRequests(), this.countPendingChangeRequests()]);
+    return a + b;
+  }
+
+  /** Bastonária aprova (aplica a categoria) ou rejeita. */
+  async resolveCategory(id: string, dto: ResolveDto) {
+    const r = await this.catModel.findById(id).exec();
+    if (!r) throw new NotFoundException('Pedido não encontrado.');
+    if (r.status !== 'pending') throw new BadRequestException('Pedido já resolvido.');
+    if (dto.status === 'approved') {
+      const member = await this.model.findById(r.member).exec();
+      if (!member) throw new NotFoundException('Médico não encontrado.');
+      let cats = [...(member.categorias ?? [])];
+      if (r.action === 'add') {
+        if (r.categoria === 'orientador' && !cats.includes('especialista')) {
+          throw new BadRequestException('O médico já não é especialista; não pode ser orientador.');
+        }
+        if (['interno', 'especialista'].includes(r.categoria)) cats = cats.filter((c) => c !== 'clinico_geral');
+        if (!cats.includes(r.categoria)) cats.push(r.categoria);
+      } else {
+        cats = cats.filter((c) => c !== r.categoria);
+        // Remover especialista também remove orientador (deixa de poder orientar).
+        if (r.categoria === 'especialista') cats = cats.filter((c) => c !== 'orientador');
+        if (cats.length === 0) cats = ['clinico_geral'];
+      }
+      member.categorias = cats;
+      await member.save();
+    }
+    r.status = dto.status === 'approved' ? 'approved' : 'rejected';
+    r.adminNotes = dto.adminNotes ?? '';
+    await r.save();
+    return r;
+  }
 }
 
 @Controller('members')
@@ -310,6 +413,19 @@ export class MembersController {
   @Patch('change-requests/:id')
   resolve(@Param('id') id: string, @Body() dto: ResolveDto) { return this.s.resolveChange(id, dto); }
 
+  // ---- Atribuições de categoria ----
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.COLEGIO)
+  @Post('category-request')
+  requestCategory(@CurrentUser() a: AuthUser, @Body() dto: CategoryReqDto) { return this.s.requestCategory(a, dto); }
+
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA)
+  @Get('category-requests/all')
+  categoryReqs(@Query('status') status?: string) { return this.s.listCategoryRequests(status); }
+
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA)
+  @Patch('category-requests/:id')
+  resolveCategory(@Param('id') id: string, @Body() dto: ResolveDto) { return this.s.resolveCategory(id, dto); }
+
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
   @Post()
   create(@Body() dto: CreateMemberDto) { return this.s.create(dto); }
@@ -336,9 +452,12 @@ export class MembersController {
     MongooseModule.forFeature([
       { name: Member.name, schema: MemberSchema },
       { name: MemberChangeRequest.name, schema: ChangeRequestSchema },
+      { name: CategoryRequest.name, schema: CategoryRequestSchema },
     ]),
+    UsersModule,
   ],
   controllers: [MembersController],
   providers: [MembersService],
+  exports: [MembersService],
 })
 export class MembersModule {}
