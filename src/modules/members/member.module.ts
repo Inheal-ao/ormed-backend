@@ -1,7 +1,9 @@
 import {
   Module, Injectable, Controller, Get, Post, Patch, Delete, Param, Body, Query,
   NotFoundException, ForbiddenException, BadRequestException, OnApplicationBootstrap, Logger,
+  UseInterceptors, UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model, Types } from 'mongoose';
@@ -14,6 +16,9 @@ import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decora
 import { UserRole } from '../../users/schemas/user.schema';
 import { UsersModule } from '../../users/users.module';
 import { UsersService } from '../../users/users.service';
+import { Asset, AssetSchema } from '../../common/schemas/asset.schema';
+import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
+import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 
 export type MemberDocument = HydratedDocument<Member>;
 export type ChangeRequestDocument = HydratedDocument<MemberChangeRequest>;
@@ -38,7 +43,9 @@ export class Member {
   @Prop({ default: '', trim: true, lowercase: true }) email: string;
   @Prop({ default: '', trim: true }) especialidade: string;
   @Prop({ default: '', trim: true }) provincia: string;
+  @Prop({ default: '', trim: true }) pais: string; // nacionalidade / país
   @Prop({ default: '', trim: true }) residencia: string;
+  @Prop({ type: AssetSchema, default: null }) photo: Asset | null; // foto do médico (aparece nas buscas)
   @Prop({ default: '' }) notes: string; // notas internas
   @Prop({ default: 'ativo', enum: ['ativo', 'suspenso'], index: true }) status: string;
   // Situação oficial da inscrição: Em Vigor / Suspensa / Cancelada.
@@ -91,6 +98,7 @@ class CreateMemberDto {
   @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsString() @MaxLength(120) especialidade?: string;
   @IsOptional() @IsString() @MaxLength(80) provincia?: string;
+  @IsOptional() @IsString() @MaxLength(80) pais?: string;
   @IsOptional() @IsString() @MaxLength(200) residencia?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   @IsOptional() @IsIn(SITUACOES as unknown as string[]) situacao?: string;
@@ -103,6 +111,7 @@ class UpdateMemberDto {
   @IsOptional() @IsString() @MaxLength(120) email?: string;
   @IsOptional() @IsString() @MaxLength(120) especialidade?: string;
   @IsOptional() @IsString() @MaxLength(80) provincia?: string;
+  @IsOptional() @IsString() @MaxLength(80) pais?: string;
   @IsOptional() @IsString() @MaxLength(200) residencia?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   @IsOptional() @IsString() status?: string;
@@ -142,7 +151,19 @@ export class MembersService implements OnApplicationBootstrap {
     @InjectModel(MemberChangeRequest.name) private readonly reqModel: Model<ChangeRequestDocument>,
     @InjectModel(CategoryRequest.name) private readonly catModel: Model<CategoryRequestDocument>,
     private readonly users: UsersService,
+    private readonly cloudinary: CloudinaryService,
   ) {}
+
+  /** Carrega/atualiza a foto do médico (aparece nas buscas). */
+  async setPhoto(id: string, file?: Express.Multer.File) {
+    const m = await this.model.findById(id).exec();
+    if (!m) throw new NotFoundException('Médico não encontrado.');
+    if (!file) throw new BadRequestException('Anexe uma imagem.');
+    const up = await this.cloudinary.uploadImage(file, 'ormed/medicos');
+    m.photo = { url: up.url, publicId: up.publicId };
+    await m.save();
+    return this.safe(m);
+  }
 
   /** Banco de médicos simulado para testes — substituível por médicos reais. */
   async onApplicationBootstrap() {
@@ -442,6 +463,10 @@ export class MembersController {
   @Post(':id/code')
   regen(@Param('id') id: string) { return this.s.regenCode(id); }
 
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
+  @Patch(':id/photo') @UseInterceptors(FileInterceptor('photo'))
+  photo(@Param('id') id: string, @UploadedFile() f: Express.Multer.File) { return this.s.setPhoto(id, f); }
+
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA)
   @Delete(':id')
   remove(@Param('id') id: string) { return this.s.remove(id); }
@@ -455,6 +480,7 @@ export class MembersController {
       { name: CategoryRequest.name, schema: CategoryRequestSchema },
     ]),
     UsersModule,
+    CloudinaryModule,
   ],
   controllers: [MembersController],
   providers: [MembersService],
