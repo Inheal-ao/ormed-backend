@@ -27,13 +27,19 @@ const DEFAULT_STATS = [
   { value: '98%', label: 'Taxa de Satisfação', icon: 'Heart', order: 4 },
 ];
 
-const DEFAULT_SPECIALTIES = [
-  'Medicina Geral e Familiar', 'Medicina Interna', 'Cirurgia Geral', 'Pediatria',
-  'Ginecologia e Obstetrícia', 'Anestesiologia', 'Cardiologia', 'Dermatologia',
-  'Endocrinologia', 'Gastroenterologia', 'Hematologia', 'Infectologia', 'Nefrologia',
-  'Neurologia', 'Oftalmologia', 'Ortopedia', 'Otorrinolaringologia', 'Pneumologia',
-  'Psiquiatria', 'Radiologia', 'Reumatologia', 'Urologia', 'Oncologia',
-  'Medicina Intensiva', 'Medicina de Emergência',
+// ANEXO I — Lista oficial das especialidades reconhecidas em Angola (39).
+// Fonte de verdade para a formação dos Colégios de Especialidades.
+const OFFICIAL_SPECIALTIES = [
+  'Anestesiologia', 'Anatomia Patológica', 'Cardiologia', 'Cardiologia Pediátrica',
+  'Cirurgia Cardiotorácica', 'Cirurgia Geral', 'Cirurgia Pediátrica', 'Cirurgia Plástica',
+  'Cirurgia Vascular', 'Dermatologia', 'Endocrinologia', 'Ginecologia e Obstetrícia',
+  'Gastroenterologia', 'Hematologia', 'Imunoalergologia', 'Infecciologia',
+  'Medicina do Trabalho', 'Medicina Física e Reabilitação', 'Medicina Interna',
+  'Medicina Legal', 'Nefrologia', 'Neonatologia', 'Neurocirurgia', 'Neurologia',
+  'Oftalmologia', 'Oncologia', 'Oncologia e Hemato-oncologia Pediátrica',
+  'Ortopedia e Traumatologia', 'Otorrinolaringologia', 'Patologia Clínica', 'Pediatria',
+  'Pneumologia', 'Psiquiatria', 'Radiologia', 'Reumatologia', 'Saúde Pública',
+  'Urologia', 'Medicina Intensiva', 'Geriatria',
 ];
 
 const DEFAULT_BASTONARIOS = [
@@ -91,15 +97,30 @@ export class ContentSeederService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap() {
     await this.seedIfEmpty('estatísticas', this.statModel, DEFAULT_STATS);
-    await this.seedIfEmpty(
-      'especialidades',
-      this.specialtyModel,
-      DEFAULT_SPECIALTIES.map((name, i) => ({ name, order: i })),
-    );
+    await this.ensureOfficialSpecialties();
     await this.seedIfEmpty('bastonários', this.bastonarioModel, DEFAULT_BASTONARIOS);
     await this.seedIfEmpty('FAQs', this.faqModel, DEFAULT_FAQS.map((f, i) => ({ ...f, order: i })));
     await this.seedIfEmpty('cronologia', this.milestoneModel, DEFAULT_TIMELINE);
     await this.seedIfEmpty('testemunhos', this.testimonialModel, DEFAULT_TESTIMONIALS);
+  }
+
+  /** Garante que as 39 especialidades oficiais (ANEXO I) existem, mesmo que a coleção já tenha dados. */
+  private async ensureOfficialSpecialties() {
+    try {
+      let added = 0;
+      for (let i = 0; i < OFFICIAL_SPECIALTIES.length; i++) {
+        const name = OFFICIAL_SPECIALTIES[i];
+        const res = await this.specialtyModel.updateOne(
+          { name },
+          { $set: { order: i }, $setOnInsert: { name, isPublished: true } },
+          { upsert: true },
+        ).exec();
+        if (res.upsertedCount) added += 1;
+      }
+      this.logger.log(`Especialidades oficiais garantidas (${OFFICIAL_SPECIALTIES.length} total, ${added} novas).`);
+    } catch (err) {
+      this.logger.error(`Falha a garantir especialidades oficiais: ${(err as Error).message}`);
+    }
   }
 
   private async seedIfEmpty(
