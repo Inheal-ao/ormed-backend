@@ -72,8 +72,12 @@ export class Rotation {
   @Prop({ default: '', trim: true }) period: string; // ex.: 2025 - 1º semestre
   @Prop({ default: 0 }) grade: number;
   @Prop({ default: 20 }) maxGrade: number;
-  @Prop({ default: '', trim: true }) evaluator: string;
+  @Prop({ default: '', trim: true }) evaluatorId: string; // orientador (médico do banco)
+  @Prop({ default: '', trim: true }) evaluator: string; // snapshot do nome do orientador
   @Prop({ default: '' }) notes: string;
+  // Fluxo de assinatura: rascunho (por assinar) -> final (assinada e enviada).
+  @Prop({ default: 'rascunho', enum: ['rascunho', 'final'], index: true }) status: string;
+  @Prop({ type: AssetSchema, default: null }) signedDocument: Asset | null; // nota assinada (PDF)
 }
 export const RotationSchema = SchemaFactory.createForClass(Rotation);
 export type RotationDocument = HydratedDocument<Rotation>;
@@ -109,7 +113,7 @@ class RotationDto {
   @IsOptional() @IsString() @MaxLength(60) period?: string;
   @IsOptional() @Type(() => Number) @IsNumber() grade?: number;
   @IsOptional() @Type(() => Number) @IsNumber() maxGrade?: number;
-  @IsOptional() @IsString() @MaxLength(150) evaluator?: string;
+  @IsOptional() @IsString() @MaxLength(60) evaluatorId?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 
@@ -253,18 +257,50 @@ export class CollegesService {
     if (interno) filter.interno = new Types.ObjectId(interno);
     return this.rotations.find(filter).sort({ createdAt: -1 }).exec();
   }
+  /** Valida que o avaliador é orientador e devolve o seu nome. */
+  private async orientadorName(evaluatorId?: string): Promise<string> {
+    if (!evaluatorId) return '';
+    const m = await this.members.findById(evaluatorId).exec();
+    if (!m) throw new NotFoundException('Orientador não encontrado no banco da Ordem.');
+    if (!(m.categorias ?? []).includes('orientador')) {
+      throw new ForbiddenException('O avaliador tem de ser um médico orientador.');
+    }
+    return m.name;
+  }
+
   async createRotation(actor: AuthUser, dto: RotationDto) {
     const college = (await this.scope(actor, dto.college)) ?? dto.college;
     if (!college || !dto.interno) throw new ForbiddenException('Indique o colégio e o interno.');
     await this.assertOwn(actor, college);
     const it = await this.internos.findById(dto.interno).exec();
-    return this.rotations.create({ ...dto, college, interno: new Types.ObjectId(dto.interno), internoName: it?.name ?? '' });
+    const evaluator = await this.orientadorName(dto.evaluatorId);
+    return this.rotations.create({
+      ...dto, college, interno: new Types.ObjectId(dto.interno), internoName: it?.name ?? '',
+      evaluator, status: 'rascunho', signedDocument: null,
+    });
   }
   async updateRotation(actor: AuthUser, id: string, dto: RotationDto) {
     const r = await this.rotations.findById(id).exec();
     if (!r) throw new NotFoundException();
     await this.assertOwn(actor, r.college);
-    return this.rotations.findByIdAndUpdate(id, dto, { new: true }).exec();
+    const patch: Record<string, unknown> = { ...dto };
+    delete patch.college; delete patch.interno;
+    if (dto.evaluatorId !== undefined) patch.evaluator = await this.orientadorName(dto.evaluatorId);
+    // Editar uma nota já enviada volta a pô-la em rascunho (exige nova assinatura).
+    if (r.status === 'final') { patch.status = 'rascunho'; patch.signedDocument = null; }
+    return this.rotations.findByIdAndUpdate(id, patch, { new: true }).exec();
+  }
+  /** Anexa a nota assinada (PDF) e finaliza/envia definitivamente. */
+  async signRotation(actor: AuthUser, id: string, file?: Express.Multer.File) {
+    const r = await this.rotations.findById(id).exec();
+    if (!r) throw new NotFoundException();
+    await this.assertOwn(actor, r.college);
+    if (!file) throw new ForbiddenException('Anexe o documento da nota assinada (PDF).');
+    const up = await this.cloudinary.uploadPdf(file, 'ormed/notas-rotacoes');
+    r.signedDocument = { url: up.url, publicId: up.publicId };
+    r.status = 'final';
+    await r.save();
+    return r;
   }
   async removeRotation(actor: AuthUser, id: string) {
     const r = await this.rotations.findById(id).exec();
@@ -316,6 +352,8 @@ export class CollegesController {
   createRotation(@CurrentUser() a: AuthUser, @Body() dto: RotationDto) { return this.s.createRotation(a, dto); }
   @Roles(...ALL) @Patch('rotations/:id')
   updRotation(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: RotationDto) { return this.s.updateRotation(a, id, dto); }
+  @Roles(...ALL) @Patch('rotations/:id/sign') @UseInterceptors(FileInterceptor('document'))
+  signRotation(@CurrentUser() a: AuthUser, @Param('id') id: string, @UploadedFile() f: Express.Multer.File) { return this.s.signRotation(a, id, f); }
   @Roles(...ALL) @Delete('rotations/:id')
   delRotation(@CurrentUser() a: AuthUser, @Param('id') id: string) { return this.s.removeRotation(a, id); }
 }
