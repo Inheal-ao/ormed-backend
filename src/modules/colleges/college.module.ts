@@ -12,6 +12,7 @@ import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 import { UsersModule } from '../../users/users.module';
 import { UsersService } from '../../users/users.service';
+import { Member, MemberSchema, MemberDocument } from '../members/member.module';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
@@ -34,14 +35,16 @@ export type CollegeDocument = HydratedDocument<College>;
 @Schema({ timestamps: true })
 export class Interno {
   @Prop({ required: true, index: true }) college: string; // id do colégio
-  @Prop({ required: true, trim: true }) name: string;
+  @Prop({ default: '', index: true }) memberId: string; // médico no banco da Ordem
+  @Prop({ required: true, trim: true }) name: string; // snapshot do banco
   @Prop({ default: '', trim: true }) numeroOrdem: string;
   @Prop({ default: '', trim: true }) biPassaporte: string;
   @Prop({ default: '', trim: true }) phone: string;
   @Prop({ default: '', trim: true }) email: string;
   @Prop({ default: '', trim: true }) anoInternato: string; // ex.: 1º ano
   @Prop({ default: '', trim: true }) hospital: string;
-  @Prop({ default: '', trim: true }) orientador: string;
+  @Prop({ default: '', trim: true }) orientadorId: string; // médico orientador (banco)
+  @Prop({ default: '', trim: true }) orientador: string; // snapshot do nome do orientador
   @Prop({ default: 'ativo', enum: ['ativo', 'concluido', 'suspenso'] }) status: string;
 }
 export const InternoSchema = SchemaFactory.createForClass(Interno);
@@ -50,6 +53,8 @@ export type InternoDocument = HydratedDocument<Interno>;
 @Schema({ timestamps: true })
 export class Programa {
   @Prop({ required: true, index: true }) college: string;
+  // tipo: programa de ensino, mapa de rotações, comunicado ou outro documento
+  @Prop({ default: 'programa', enum: ['programa', 'mapa_rotacoes', 'comunicado', 'outro'], index: true }) tipo: string;
   @Prop({ required: true, trim: true }) title: string;
   @Prop({ default: '', trim: true }) ano: string;
   @Prop({ default: '' }) description: string;
@@ -83,18 +88,15 @@ class CollegeDto {
 }
 class InternoDto {
   @IsOptional() @IsString() @MaxLength(60) college?: string;
-  @IsOptional() @IsString() @MaxLength(150) name?: string;
-  @IsOptional() @IsString() @MaxLength(40) numeroOrdem?: string;
-  @IsOptional() @IsString() @MaxLength(40) biPassaporte?: string;
-  @IsOptional() @IsString() @MaxLength(40) phone?: string;
-  @IsOptional() @IsString() @MaxLength(120) email?: string;
+  @IsOptional() @IsString() @MaxLength(60) memberId?: string;
   @IsOptional() @IsString() @MaxLength(40) anoInternato?: string;
   @IsOptional() @IsString() @MaxLength(120) hospital?: string;
-  @IsOptional() @IsString() @MaxLength(120) orientador?: string;
+  @IsOptional() @IsString() @MaxLength(60) orientadorId?: string;
   @IsOptional() @IsString() status?: string;
 }
 class ProgramaDto {
   @IsOptional() @IsString() @MaxLength(60) college?: string;
+  @IsOptional() @IsString() @MaxLength(20) tipo?: string;
   @IsOptional() @IsString() @MaxLength(200) title?: string;
   @IsOptional() @IsString() @MaxLength(40) ano?: string;
   @IsOptional() @IsString() @MaxLength(4000) description?: string;
@@ -118,9 +120,25 @@ export class CollegesService {
     @InjectModel(Interno.name) private readonly internos: Model<InternoDocument>,
     @InjectModel(Programa.name) private readonly programas: Model<ProgramaDocument>,
     @InjectModel(Rotation.name) private readonly rotations: Model<RotationDocument>,
+    @InjectModel(Member.name) private readonly members: Model<MemberDocument>,
     private readonly cloudinary: CloudinaryService,
     private readonly users: UsersService,
   ) {}
+
+  /** Lê um médico do banco e devolve o snapshot dos campos de identificação. */
+  private async memberSnapshot(memberId: string) {
+    const m = await this.members.findById(memberId).exec();
+    if (!m) throw new NotFoundException('Médico não encontrado no banco da Ordem.');
+    return {
+      memberId,
+      name: m.name,
+      numeroOrdem: m.numeroOrdem,
+      biPassaporte: m.biPassaporte,
+      phone: m.phone,
+      email: m.email,
+      especialidade: m.especialidade,
+    };
+  }
 
   /** Determina o colégio a usar: o perfil colégio é forçado ao seu; os outros usam o filtro pedido. */
   private async scope(actor: AuthUser, requested?: string): Promise<string | undefined> {
@@ -157,14 +175,32 @@ export class CollegesService {
   async createInterno(actor: AuthUser, dto: InternoDto) {
     const college = (await this.scope(actor, dto.college)) ?? dto.college;
     if (!college) throw new ForbiddenException('Indique o colégio.');
+    if (!dto.memberId) throw new ForbiddenException('Selecione o médico no banco da Ordem.');
     await this.assertOwn(actor, college);
-    return this.internos.create({ ...dto, college });
+    const exists = await this.internos.exists({ college, memberId: dto.memberId });
+    if (exists) throw new ForbiddenException('Este médico já está associado a este colégio.');
+    const snap = await this.memberSnapshot(dto.memberId);
+    const orientador = dto.orientadorId ? (await this.memberSnapshot(dto.orientadorId)).name : '';
+    // Associa o médico ao colégio no banco.
+    await this.members.findByIdAndUpdate(dto.memberId, { collegeId: college }).exec();
+    return this.internos.create({
+      ...snap, college, anoInternato: dto.anoInternato ?? '', hospital: dto.hospital ?? '',
+      orientadorId: dto.orientadorId ?? '', orientador, status: dto.status ?? 'ativo',
+    });
   }
   async updateInterno(actor: AuthUser, id: string, dto: InternoDto) {
     const it = await this.internos.findById(id).exec();
     if (!it) throw new NotFoundException();
     await this.assertOwn(actor, it.college);
-    return this.internos.findByIdAndUpdate(id, dto, { new: true }).exec();
+    const patch: Record<string, unknown> = {
+      anoInternato: dto.anoInternato, hospital: dto.hospital, status: dto.status,
+    };
+    if (dto.orientadorId !== undefined) {
+      patch.orientadorId = dto.orientadorId;
+      patch.orientador = dto.orientadorId ? (await this.memberSnapshot(dto.orientadorId)).name : '';
+    }
+    Object.keys(patch).forEach((k) => patch[k] === undefined && delete patch[k]);
+    return this.internos.findByIdAndUpdate(id, patch, { new: true }).exec();
   }
   async removeInterno(actor: AuthUser, id: string) {
     const it = await this.internos.findById(id).exec();
@@ -291,6 +327,7 @@ export class CollegesController {
       { name: Interno.name, schema: InternoSchema },
       { name: Programa.name, schema: ProgramaSchema },
       { name: Rotation.name, schema: RotationSchema },
+      { name: Member.name, schema: MemberSchema },
     ]),
     CloudinaryModule,
     UsersModule,
