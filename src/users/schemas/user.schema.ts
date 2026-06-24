@@ -38,7 +38,11 @@ export class User {
   universityName: string;
 
   @Prop({ default: '', trim: true })
-  responsibleType: string; // 'reitor' | 'decano'
+  responsibleType: string; // 'reitor' | 'decano' | 'diretor' | 'presidente'
+
+  // Tipo de instituição que envia listas: universidade | ies | inaarees.
+  @Prop({ default: 'universidade', enum: ['universidade', 'ies', 'inaarees'], trim: true })
+  institutionType: string;
 
   @Prop({ default: '', trim: true })
   phone: string;

@@ -23,6 +23,8 @@ export type UniversityListDocument = HydratedDocument<UniversityList>;
 export class UniversityList {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true }) university: Types.ObjectId;
   @Prop({ required: true, trim: true }) universityName: string;
+  // Tipo de instituição: universidade | ies | inaarees.
+  @Prop({ default: 'universidade', index: true }) institutionType: string;
   @Prop({ required: true, trim: true }) year: string; // ano académico dos finalistas
   @Prop({ type: AssetSchema, required: true }) digitalPdf: Asset; // lista digital (PDF)
   @Prop({ type: AssetSchema, required: true }) signedScan: Asset; // documento assinado e digitalizado
@@ -72,6 +74,7 @@ export class UniversityListsService {
     return this.model.create({
       university: new Types.ObjectId(actor.userId),
       universityName: me?.universityName || me?.name || '',
+      institutionType: (me as any)?.institutionType || 'universidade',
       year: dto.year,
       digitalPdf, signedScan,
       notes: dto.notes ?? '',

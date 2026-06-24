@@ -3,9 +3,12 @@ import {
   UseInterceptors, UploadedFile, ForbiddenException, NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model, Types } from 'mongoose';
+import * as bcrypt from 'bcrypt';
 import { IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Public } from '../../auth/decorators/public.decorator';
 import { Type } from 'class-transformer';
 import { Asset, AssetSchema } from '../../common/schemas/asset.schema';
 import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
@@ -104,6 +107,10 @@ class ProgramaDto {
   @IsOptional() @IsString() @MaxLength(200) title?: string;
   @IsOptional() @IsString() @MaxLength(40) ano?: string;
   @IsOptional() @IsString() @MaxLength(4000) description?: string;
+}
+class InternoDossierDto {
+  @IsString() numeroUtente: string;
+  @IsString() @MinLength(6) @MaxLength(6) code: string;
 }
 class RotationDto {
   @IsOptional() @IsString() interno?: string;
@@ -309,11 +316,32 @@ export class CollegesService {
     await this.rotations.findByIdAndDelete(id).exec();
     return { ok: true };
   }
+
+  // ===== Vista do Médico Interno (acesso pelo código do portal do membro) =====
+  async internoDossier(dto: InternoDossierDto) {
+    const m = await this.members.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash').exec();
+    if (!m || !(m as any).accessCodeHash || !(await bcrypt.compare(dto.code.trim(), (m as any).accessCodeHash))) {
+      throw new ForbiddenException('Código de acesso inválido.');
+    }
+    if (!(m.categorias ?? []).includes('interno')) return { isInterno: false };
+    const interno = await this.internos.findOne({ memberId: String(m._id) }).exec();
+    if (!interno) return { isInterno: true, interno: null };
+    const [college, rotations, programas] = await Promise.all([
+      this.colleges.findById(interno.college).exec(),
+      this.rotations.find({ interno: interno._id, status: 'final' }).sort({ createdAt: -1 }).exec(),
+      this.programas.find({ college: interno.college }).sort({ createdAt: -1 }).exec(),
+    ]);
+    return { isInterno: true, college, interno, rotations, programas };
+  }
 }
 
 @Controller('colleges')
 export class CollegesController {
   constructor(private readonly s: CollegesService) {}
+
+  // Vista do Médico Interno (público, verificado pelo código do portal do membro)
+  @Public() @Throttle({ default: { limit: 12, ttl: 60_000 } }) @Post('interno-dossier')
+  internoDossier(@Body() dto: InternoDossierDto) { return this.s.internoDossier(dto); }
 
   // Colégios
   @Roles(...ALL) @Get()

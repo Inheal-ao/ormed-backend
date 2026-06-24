@@ -24,7 +24,8 @@ class CreateUniversityDto {
   @IsEmail() email: string;
   @IsString() @MaxLength(100) @Matches(STRONG_PW,{message:STRONG_PW_MSG}) password: string;
   @IsString() @MinLength(2) @MaxLength(200) universityName: string;
-  @IsIn(['reitor', 'decano']) responsibleType: string;
+  @IsIn(['reitor', 'decano', 'diretor', 'presidente']) responsibleType: string;
+  @IsOptional() @IsIn(['universidade', 'ies', 'inaarees']) institutionType?: string;
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
 }
 class CreateColegioDto {
@@ -39,7 +40,8 @@ class UpdateUserDto {
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) permissions?: string[];
   @IsOptional() @IsString() @MaxLength(200) universityName?: string;
-  @IsOptional() @IsIn(['reitor', 'decano', '']) responsibleType?: string;
+  @IsOptional() @IsIn(['reitor', 'decano', 'diretor', 'presidente', '']) responsibleType?: string;
+  @IsOptional() @IsIn(['universidade', 'ies', 'inaarees']) institutionType?: string;
   @IsOptional() @IsString() @MaxLength(60) collegeId?: string;
 }
 class BlockDto {
@@ -53,7 +55,8 @@ function sanitize(u: any) {
   return {
     _id: u._id, name: u.name, email: u.email, role: u.role,
     permissions: u.permissions ?? [], universityName: u.universityName ?? '',
-    responsibleType: u.responsibleType ?? '', phone: u.phone ?? '', collegeId: u.collegeId ?? '',
+    responsibleType: u.responsibleType ?? '', institutionType: u.institutionType ?? 'universidade',
+    phone: u.phone ?? '', collegeId: u.collegeId ?? '',
     isActive: u.isActive, isBlocked: u.isBlocked, lastLoginAt: u.lastLoginAt,
     createdAt: u.createdAt,
   };
@@ -112,6 +115,7 @@ export class UsersController {
     const u = await this.users.create({
       name: dto.name, email: dto.email, password: dto.password, phone: dto.phone,
       role: UserRole.UNIVERSIDADE, universityName: dto.universityName, responsibleType: dto.responsibleType,
+      institutionType: dto.institutionType ?? 'universidade',
     });
     return sanitize(u);
   }

@@ -19,6 +19,7 @@ export interface CreateUserInput {
   permissions?: string[];
   universityName?: string;
   responsibleType?: string;
+  institutionType?: string;
   phone?: string;
   collegeId?: string;
 }
@@ -44,6 +45,7 @@ export class UsersService {
       permissions: input.permissions ?? [],
       universityName: input.universityName ?? '',
       responsibleType: input.responsibleType ?? '',
+      institutionType: input.institutionType ?? 'universidade',
       phone: input.phone ?? '',
       collegeId: input.collegeId ?? '',
     });
@@ -107,7 +109,7 @@ export class UsersService {
   /** Atualiza dados de perfil (nome, telefone, permissões, dados da universidade). */
   async updateInfo(
     id: string,
-    patch: Partial<Pick<User, 'name' | 'phone' | 'permissions' | 'universityName' | 'responsibleType'>>,
+    patch: Partial<Pick<User, 'name' | 'phone' | 'permissions' | 'universityName' | 'responsibleType' | 'institutionType' | 'collegeId'>>,
   ): Promise<UserDocument> {
     const user = await this.userModel.findByIdAndUpdate(id, patch, { new: true }).exec();
     if (!user) throw new NotFoundException('Utilizador não encontrado.');
