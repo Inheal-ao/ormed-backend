@@ -7,9 +7,8 @@ import { Throttle } from '@nestjs/throttler';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Public } from '../../auth/decorators/public.decorator';
-import { Type } from 'class-transformer';
 import { Asset, AssetSchema } from '../../common/schemas/asset.schema';
 import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
@@ -29,7 +28,8 @@ export class College {
   @Prop({ required: true, trim: true }) name: string; // ex.: Colégio de Cardiologia
   @Prop({ default: '', trim: true }) especialidade: string;
   @Prop({ default: '' }) description: string;
-  @Prop({ default: '', trim: true }) coordinator: string;
+  @Prop({ default: '', index: true }) presidentId: string; // médico do banco (presidente do colégio)
+  @Prop({ default: '', trim: true }) coordinator: string; // snapshot do nome do presidente
   @Prop({ default: 'ativo', enum: ['ativo', 'inativo'] }) status: string;
 }
 export const CollegeSchema = SchemaFactory.createForClass(College);
@@ -66,21 +66,40 @@ export class Programa {
 export const ProgramaSchema = SchemaFactory.createForClass(Programa);
 export type ProgramaDocument = HydratedDocument<Programa>;
 
+// Linha do Mapa de Registo de Habilidades.
+@Schema({ _id: false })
+export class Competencia {
+  @Prop({ default: '', trim: true }) competencia: string;
+  @Prop({ default: 0 }) totalMinimo: number; // total mínimo a realizar/avaliação
+  @Prop({ default: 0 }) observador: number;
+  @Prop({ default: 0 }) ajudante: number;
+  @Prop({ default: 0 }) executor: number;
+  @Prop({ default: 0 }) totalRealizado: number;
+}
+const CompetenciaSchema = SchemaFactory.createForClass(Competencia);
+
+/** Mapa de Registo de Habilidades do interno numa rotação/módulo (preenchido pelo orientador). */
 @Schema({ timestamps: true })
 export class Rotation {
   @Prop({ type: Types.ObjectId, ref: 'Interno', required: true, index: true }) interno: Types.ObjectId;
   @Prop({ required: true, index: true }) college: string;
   @Prop({ default: '', trim: true }) internoName: string;
-  @Prop({ required: true, trim: true }) rotationName: string; // ex.: Cardiologia de Intervenção
-  @Prop({ default: '', trim: true }) period: string; // ex.: 2025 - 1º semestre
-  @Prop({ default: 0 }) grade: number;
-  @Prop({ default: 20 }) maxGrade: number;
+  @Prop({ default: '', trim: true }) especialidade: string; // do colégio
+  @Prop({ required: true, trim: true }) rotationName: string; // rotação/módulo de (ex.: Pediatria)
+  @Prop({ default: '', trim: true }) periodoInicio: string; // data início da avaliação
+  @Prop({ default: '', trim: true }) periodoFim: string; // data fim da avaliação
+  @Prop({ default: '', trim: true }) anoInternato: string; // ex.: 1º ano
+  @Prop({ default: '', trim: true }) provincia: string;
+  @Prop({ default: '', trim: true }) municipio: string;
+  @Prop({ default: '', trim: true }) hospital: string;
+  @Prop({ default: '', trim: true }) instituicaoResponsavel: string;
+  @Prop({ type: [CompetenciaSchema], default: [] }) competencias: Competencia[];
+  @Prop({ default: '' }) observacoes: string;
   @Prop({ default: '', trim: true }) evaluatorId: string; // orientador (médico do banco)
   @Prop({ default: '', trim: true }) evaluator: string; // snapshot do nome do orientador
-  @Prop({ default: '' }) notes: string;
   // Fluxo de assinatura: rascunho (por assinar) -> final (assinada e enviada).
   @Prop({ default: 'rascunho', enum: ['rascunho', 'final'], index: true }) status: string;
-  @Prop({ type: AssetSchema, default: null }) signedDocument: Asset | null; // nota assinada (PDF)
+  @Prop({ type: AssetSchema, default: null }) signedDocument: Asset | null; // mapa assinado (PDF)
 }
 export const RotationSchema = SchemaFactory.createForClass(Rotation);
 export type RotationDocument = HydratedDocument<Rotation>;
@@ -90,7 +109,7 @@ class CollegeDto {
   @IsOptional() @IsString() @MaxLength(150) name?: string;
   @IsOptional() @IsString() @MaxLength(120) especialidade?: string;
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
-  @IsOptional() @IsString() @MaxLength(150) coordinator?: string;
+  @IsOptional() @IsString() @MaxLength(60) presidentId?: string;
   @IsOptional() @IsString() status?: string;
 }
 class InternoDto {
@@ -115,13 +134,17 @@ class InternoDossierDto {
 class RotationDto {
   @IsOptional() @IsString() interno?: string;
   @IsOptional() @IsString() @MaxLength(60) college?: string;
-  @IsOptional() @IsString() @MaxLength(150) internoName?: string;
   @IsOptional() @IsString() @MaxLength(200) rotationName?: string;
-  @IsOptional() @IsString() @MaxLength(60) period?: string;
-  @IsOptional() @Type(() => Number) @IsNumber() grade?: number;
-  @IsOptional() @Type(() => Number) @IsNumber() maxGrade?: number;
+  @IsOptional() @IsString() @MaxLength(40) periodoInicio?: string;
+  @IsOptional() @IsString() @MaxLength(40) periodoFim?: string;
+  @IsOptional() @IsString() @MaxLength(40) anoInternato?: string;
+  @IsOptional() @IsString() @MaxLength(80) provincia?: string;
+  @IsOptional() @IsString() @MaxLength(80) municipio?: string;
+  @IsOptional() @IsString() @MaxLength(150) hospital?: string;
+  @IsOptional() @IsString() @MaxLength(200) instituicaoResponsavel?: string;
+  @IsOptional() @IsArray() competencias?: unknown[];
+  @IsOptional() @IsString() @MaxLength(4000) observacoes?: string;
   @IsOptional() @IsString() @MaxLength(60) evaluatorId?: string;
-  @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 
 @Injectable()
@@ -174,8 +197,17 @@ export class CollegesService {
     }
     return this.colleges.find().sort({ name: 1 }).exec();
   }
-  createCollege(dto: CollegeDto) { return this.colleges.create(dto); }
-  updateCollege(id: string, dto: CollegeDto) { return this.colleges.findByIdAndUpdate(id, dto, { new: true }).exec(); }
+  /** Se vier presidentId, valida o médico (em vigor) e guarda o nome em coordinator. */
+  private async withPresident(dto: CollegeDto): Promise<CollegeDto & { coordinator?: string }> {
+    if (dto.presidentId === undefined) return dto;
+    if (!dto.presidentId) return { ...dto, coordinator: '' };
+    const m = await this.members.findById(dto.presidentId).exec();
+    if (!m) throw new NotFoundException('Médico não encontrado no banco da Ordem.');
+    if (m.situacao !== 'vigor') throw new ForbiddenException('O presidente do colégio tem de ter a inscrição em vigor (situação regular).');
+    return { ...dto, coordinator: m.name };
+  }
+  async createCollege(dto: CollegeDto) { return this.colleges.create(await this.withPresident(dto)); }
+  async updateCollege(id: string, dto: CollegeDto) { return this.colleges.findByIdAndUpdate(id, await this.withPresident(dto), { new: true }).exec(); }
   async removeCollege(id: string) { await this.colleges.findByIdAndDelete(id).exec(); return { ok: true }; }
 
   // Internos
@@ -275,25 +307,51 @@ export class CollegesService {
     return m.name;
   }
 
+  private cleanCompetencias(raw?: unknown[]): Competencia[] {
+    if (!Array.isArray(raw)) return [];
+    const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) && x >= 0 ? Math.floor(x) : 0; };
+    return raw.slice(0, 100).map((c) => {
+      const o = (c ?? {}) as Record<string, unknown>;
+      return {
+        competencia: String(o.competencia ?? '').slice(0, 500),
+        totalMinimo: n(o.totalMinimo), observador: n(o.observador), ajudante: n(o.ajudante),
+        executor: n(o.executor), totalRealizado: n(o.totalRealizado),
+      };
+    }).filter((c) => c.competencia.trim());
+  }
+
   async createRotation(actor: AuthUser, dto: RotationDto) {
     const college = (await this.scope(actor, dto.college)) ?? dto.college;
     if (!college || !dto.interno) throw new ForbiddenException('Indique o colégio e o interno.');
+    if (!dto.rotationName?.trim()) throw new ForbiddenException('Indique a rotação/módulo.');
     await this.assertOwn(actor, college);
-    const it = await this.internos.findById(dto.interno).exec();
+    const [it, col] = await Promise.all([
+      this.internos.findById(dto.interno).exec(),
+      this.colleges.findById(college).exec(),
+    ]);
     const evaluator = await this.orientadorName(dto.evaluatorId);
     return this.rotations.create({
-      ...dto, college, interno: new Types.ObjectId(dto.interno), internoName: it?.name ?? '',
-      evaluator, status: 'rascunho', signedDocument: null,
+      interno: new Types.ObjectId(dto.interno), college,
+      internoName: it?.name ?? '', especialidade: col?.especialidade ?? '',
+      rotationName: dto.rotationName, periodoInicio: dto.periodoInicio ?? '', periodoFim: dto.periodoFim ?? '',
+      anoInternato: dto.anoInternato || it?.anoInternato || '',
+      provincia: dto.provincia ?? '', municipio: dto.municipio ?? '',
+      hospital: dto.hospital || it?.hospital || '', instituicaoResponsavel: dto.instituicaoResponsavel ?? '',
+      competencias: this.cleanCompetencias(dto.competencias), observacoes: dto.observacoes ?? '',
+      evaluatorId: dto.evaluatorId ?? '', evaluator, status: 'rascunho', signedDocument: null,
     });
   }
   async updateRotation(actor: AuthUser, id: string, dto: RotationDto) {
     const r = await this.rotations.findById(id).exec();
     if (!r) throw new NotFoundException();
     await this.assertOwn(actor, r.college);
-    const patch: Record<string, unknown> = { ...dto };
-    delete patch.college; delete patch.interno;
-    if (dto.evaluatorId !== undefined) patch.evaluator = await this.orientadorName(dto.evaluatorId);
-    // Editar uma nota já enviada volta a pô-la em rascunho (exige nova assinatura).
+    const patch: Record<string, unknown> = {};
+    for (const k of ['rotationName', 'periodoInicio', 'periodoFim', 'anoInternato', 'provincia', 'municipio', 'hospital', 'instituicaoResponsavel', 'observacoes'] as const) {
+      if (dto[k] !== undefined) patch[k] = dto[k];
+    }
+    if (dto.competencias !== undefined) patch.competencias = this.cleanCompetencias(dto.competencias);
+    if (dto.evaluatorId !== undefined) { patch.evaluatorId = dto.evaluatorId; patch.evaluator = await this.orientadorName(dto.evaluatorId); }
+    // Editar um mapa já enviado volta a pô-lo em rascunho (exige nova assinatura).
     if (r.status === 'final') { patch.status = 'rascunho'; patch.signedDocument = null; }
     return this.rotations.findByIdAndUpdate(id, patch, { new: true }).exec();
   }
