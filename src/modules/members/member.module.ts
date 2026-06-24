@@ -242,6 +242,17 @@ export class MembersService implements OnApplicationBootstrap {
     return { member: this.safe(m), numeroUtente, accessCode: code };
   }
 
+  /** Verificação pública (QR): informação básica e situação por nº de ordem. */
+  async publicByOrdem(numeroOrdem: string) {
+    const rx = new RegExp(`^${numeroOrdem.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    const m = await this.model.findOne({ numeroOrdem: rx }).exec();
+    if (!m) throw new NotFoundException('Médico não encontrado.');
+    return {
+      name: m.name, numeroOrdem: m.numeroOrdem, especialidade: m.especialidade,
+      situacao: m.situacao, categorias: m.categorias ?? [], photo: m.photo ?? null,
+    };
+  }
+
   async findAll(opts: { search?: string; situacao?: string; categoria?: string; especialidade?: string } = {}) {
     const filter: Record<string, unknown> = {};
     if (opts.search) {
@@ -415,6 +426,12 @@ export class MembersController {
   @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @Post('change-request')
   change(@Body() dto: ChangeReqDto) { return this.s.requestChange(dto); }
+
+  // Verificação pública por QR code (receitas eletrónicas).
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('public/:numeroOrdem')
+  publicVerify(@Param('numeroOrdem') numeroOrdem: string) { return this.s.publicByOrdem(numeroOrdem); }
 
   // ---- Gestão (Ordem) ----
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR, UserRole.COLEGIO)

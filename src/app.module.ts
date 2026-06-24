@@ -44,6 +44,7 @@ import { NotificationsModule } from './modules/notifications/notification.module
 import { AuditModule } from './modules/audit/audit.module';
 import { MembersModule } from './modules/members/member.module';
 import { CollegesModule } from './modules/colleges/college.module';
+import { QuotasModule } from './modules/quotas/quota.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { CollegesModule } from './modules/colleges/college.module';
     AuditModule,
     MembersModule,
     CollegesModule,
+    QuotasModule,
   ],
   controllers: [HealthController],
   providers: [
