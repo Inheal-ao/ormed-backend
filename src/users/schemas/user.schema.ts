@@ -11,6 +11,7 @@ export enum UserRole {
   BASTONARIA = 'bastonaria', // acesso total + gere funcionários e universidades
   FUNCIONARIO = 'funcionario', // acesso às secções permitidas
   UNIVERSIDADE = 'universidade', // só o portal de listas de finalistas
+  COLEGIO = 'colegio', // gestão de um colégio de especialidade (internos, programas, notas)
 }
 
 @Schema({ timestamps: true })
@@ -41,6 +42,10 @@ export class User {
 
   @Prop({ default: '', trim: true })
   phone: string;
+
+  // Colégio: id do colégio de especialidade que este utilizador gere.
+  @Prop({ default: '', trim: true })
+  collegeId: string;
 
   @Prop({ default: true })
   isActive: boolean;

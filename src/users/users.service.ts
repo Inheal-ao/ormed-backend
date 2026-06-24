@@ -20,6 +20,7 @@ export interface CreateUserInput {
   universityName?: string;
   responsibleType?: string;
   phone?: string;
+  collegeId?: string;
 }
 
 @Injectable()
@@ -44,6 +45,7 @@ export class UsersService {
       universityName: input.universityName ?? '',
       responsibleType: input.responsibleType ?? '',
       phone: input.phone ?? '',
+      collegeId: input.collegeId ?? '',
     });
     return user.save();
   }

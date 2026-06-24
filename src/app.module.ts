@@ -43,6 +43,7 @@ import { UniversityListsModule } from './modules/university-lists/university-lis
 import { NotificationsModule } from './modules/notifications/notification.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { MembersModule } from './modules/members/member.module';
+import { CollegesModule } from './modules/colleges/college.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { MembersModule } from './modules/members/member.module';
     NotificationsModule,
     AuditModule,
     MembersModule,
+    CollegesModule,
   ],
   controllers: [HealthController],
   providers: [

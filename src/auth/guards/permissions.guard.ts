@@ -36,6 +36,7 @@ const CONTENT_MAP: Record<string, string[]> = {
   timeline: ['cronologia'],
   settings: ['definicoes'],
   members: ['membros'],
+  colleges: ['colegios', 'internos', 'programas-internato', 'notas-rotacoes'],
 };
 
 function sectionFor(path: string): string[] | null {
