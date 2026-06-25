@@ -46,6 +46,7 @@ import { MembersModule } from './modules/members/member.module';
 import { CollegesModule } from './modules/colleges/college.module';
 import { QuotasModule } from './modules/quotas/quota.module';
 import { HeroModule } from './modules/hero/hero.module';
+import { PrescriptionsModule } from './modules/prescriptions/prescription.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { HeroModule } from './modules/hero/hero.module';
     CollegesModule,
     QuotasModule,
     HeroModule,
+    PrescriptionsModule,
   ],
   controllers: [HealthController],
   providers: [
