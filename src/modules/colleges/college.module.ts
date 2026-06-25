@@ -3,6 +3,7 @@ import {
   UseInterceptors, UploadedFile, ForbiddenException, NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_LIMITS } from '../../common/upload-limits';
 import { Throttle } from '@nestjs/throttler';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model, Types } from 'mongoose';
@@ -424,9 +425,9 @@ export class CollegesController {
   // Programas
   @Roles(...ALL) @Get('programas/list')
   programas(@CurrentUser() a: AuthUser, @Query('college') c?: string) { return this.s.listProgramas(a, c); }
-  @Roles(...ALL) @Post('programas') @UseInterceptors(FileInterceptor('document'))
+  @Roles(...ALL) @Post('programas') @UseInterceptors(FileInterceptor('document', UPLOAD_LIMITS))
   createPrograma(@CurrentUser() a: AuthUser, @Body() dto: ProgramaDto, @UploadedFile() f: Express.Multer.File) { return this.s.createPrograma(a, dto, f); }
-  @Roles(...ALL) @Patch('programas/:id') @UseInterceptors(FileInterceptor('document'))
+  @Roles(...ALL) @Patch('programas/:id') @UseInterceptors(FileInterceptor('document', UPLOAD_LIMITS))
   updPrograma(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: ProgramaDto, @UploadedFile() f: Express.Multer.File) { return this.s.updatePrograma(a, id, dto, f); }
   @Roles(...ALL) @Delete('programas/:id')
   delPrograma(@CurrentUser() a: AuthUser, @Param('id') id: string) { return this.s.removePrograma(a, id); }
@@ -438,7 +439,7 @@ export class CollegesController {
   createRotation(@CurrentUser() a: AuthUser, @Body() dto: RotationDto) { return this.s.createRotation(a, dto); }
   @Roles(...ALL) @Patch('rotations/:id')
   updRotation(@CurrentUser() a: AuthUser, @Param('id') id: string, @Body() dto: RotationDto) { return this.s.updateRotation(a, id, dto); }
-  @Roles(...ALL) @Patch('rotations/:id/sign') @UseInterceptors(FileInterceptor('document'))
+  @Roles(...ALL) @Patch('rotations/:id/sign') @UseInterceptors(FileInterceptor('document', UPLOAD_LIMITS))
   signRotation(@CurrentUser() a: AuthUser, @Param('id') id: string, @UploadedFile() f: Express.Multer.File) { return this.s.signRotation(a, id, f); }
   @Roles(...ALL) @Delete('rotations/:id')
   delRotation(@CurrentUser() a: AuthUser, @Param('id') id: string) { return this.s.removeRotation(a, id); }

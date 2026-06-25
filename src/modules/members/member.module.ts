@@ -4,6 +4,7 @@ import {
   UseInterceptors, UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_LIMITS } from '../../common/upload-limits';
 import { Throttle } from '@nestjs/throttler';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model, Types } from 'mongoose';
@@ -481,7 +482,7 @@ export class MembersController {
   regen(@Param('id') id: string) { return this.s.regenCode(id); }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
-  @Patch(':id/photo') @UseInterceptors(FileInterceptor('photo'))
+  @Patch(':id/photo') @UseInterceptors(FileInterceptor('photo', UPLOAD_LIMITS))
   photo(@Param('id') id: string, @UploadedFile() f: Express.Multer.File) { return this.s.setPhoto(id, f); }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA)

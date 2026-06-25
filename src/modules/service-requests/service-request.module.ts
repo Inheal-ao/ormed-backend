@@ -3,6 +3,7 @@ import {
   UseInterceptors, UploadedFiles, UploadedFile, Res, NotFoundException, BadRequestException,
 } from '@nestjs/common';
 import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_LIMITS } from '../../common/upload-limits';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { randomBytes } from 'crypto';
@@ -282,7 +283,7 @@ export class ServiceRequestsController {
   @Public()
   @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @Post()
-  @UseInterceptors(FilesInterceptor('attachments', 8))
+  @UseInterceptors(FilesInterceptor('attachments', 8, UPLOAD_LIMITS))
   create(@Body() dto: CreateServiceRequestDto, @UploadedFiles() files: Express.Multer.File[]) {
     return this.s.create(dto, files ?? []);
   }
@@ -304,7 +305,7 @@ export class ServiceRequestsController {
   @Public()
   @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @Post('payment-proof')
-  @UseInterceptors(FileInterceptor('proof'))
+  @UseInterceptors(FileInterceptor('proof', UPLOAD_LIMITS))
   submitProof(@Query('code') code: string, @UploadedFile() file: Express.Multer.File) {
     return this.s.submitPaymentProof(code ?? '', file);
   }
@@ -330,7 +331,7 @@ export class ServiceRequestsController {
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
   @Post(':id/receipt')
-  @UseInterceptors(FileInterceptor('receipt'))
+  @UseInterceptors(FileInterceptor('receipt', UPLOAD_LIMITS))
   receipt(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: AuthUser) {
     return this.s.uploadReceipt(id, file, user);
   }

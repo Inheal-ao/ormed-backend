@@ -6,6 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_LIMITS } from '../common/upload-limits';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
@@ -20,14 +21,14 @@ export class UploadsController {
   constructor(private readonly cloudinary: CloudinaryService) {}
 
   @Post('image')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', UPLOAD_LIMITS))
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Nenhum ficheiro enviado.');
     return this.cloudinary.uploadImage(file);
   }
 
   @Post('pdf')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', UPLOAD_LIMITS))
   async uploadPdf(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Nenhum ficheiro enviado.');
     return this.cloudinary.uploadPdf(file);

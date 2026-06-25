@@ -3,6 +3,7 @@ import {
   UseInterceptors, UploadedFiles, Res,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_LIMITS } from '../../common/upload-limits';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { MongooseModule, InjectModel, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
@@ -105,7 +106,7 @@ export class ComplaintsController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
-  @UseInterceptors(FilesInterceptor('attachments', 5))
+  @UseInterceptors(FilesInterceptor('attachments', 5, UPLOAD_LIMITS))
   create(@Body() dto: CreateComplaintDto, @UploadedFiles() files: Express.Multer.File[]) {
     return this.s.create(dto, files ?? []);
   }
