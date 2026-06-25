@@ -20,6 +20,8 @@ import { UsersService } from '../../users/users.service';
 import { Asset, AssetSchema } from '../../common/schemas/asset.schema';
 import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
+import { EventRegistration, RegistrationSchema } from '../event-registrations/event-registration.module';
+import { ServiceRequest, ServiceRequestSchema } from '../service-requests/service-request.module';
 
 export type MemberDocument = HydratedDocument<Member>;
 export type ChangeRequestDocument = HydratedDocument<MemberChangeRequest>;
@@ -137,6 +139,10 @@ class ResolveDto {
   @IsString() status: string; // approved | rejected
   @IsOptional() @IsString() @MaxLength(1000) adminNotes?: string;
 }
+class AtividadeDto {
+  @IsString() numeroUtente: string;
+  @IsString() @MinLength(6) @MaxLength(6) code: string;
+}
 class CategoryReqDto {
   @IsString() memberId: string;
   @IsIn(['interno', 'especialista', 'orientador']) categoria: string;
@@ -151,9 +157,51 @@ export class MembersService implements OnApplicationBootstrap {
     @InjectModel(Member.name) private readonly model: Model<MemberDocument>,
     @InjectModel(MemberChangeRequest.name) private readonly reqModel: Model<ChangeRequestDocument>,
     @InjectModel(CategoryRequest.name) private readonly catModel: Model<CategoryRequestDocument>,
+    @InjectModel(EventRegistration.name) private readonly regModel: Model<any>,
+    @InjectModel(ServiceRequest.name) private readonly srModel: Model<any>,
     private readonly users: UsersService,
     private readonly cloudinary: CloudinaryService,
   ) {}
+
+  /** Verifica um médico apenas pelo nº de utente + código (portal). */
+  private async verifyByCode(numeroUtente: string, code: string): Promise<MemberDocument> {
+    const m = await this.model.findOne({ numeroUtente: (numeroUtente || '').trim() }).select('+accessCodeHash').exec();
+    if (!m || !m.accessCodeHash || !(await bcrypt.compare((code || '').trim(), m.accessCodeHash))) {
+      throw new ForbiddenException('Código de acesso inválido.');
+    }
+    return m;
+  }
+
+  /** Atividade do médico: inscrições em eventos/cursos e serviços/declarações pedidos (associados por email/telefone). */
+  async atividade(numeroUtente: string, code: string) {
+    const m = await this.verifyByCode(numeroUtente, code);
+    const ors: Record<string, unknown>[] = [];
+    if (m.email) ors.push({ email: m.email.toLowerCase() });
+    if (m.phone) ors.push({ phone: m.phone });
+    if (ors.length === 0) return { eventos: [], servicos: [] };
+    const filter = { $or: ors };
+
+    const [regs, srs] = await Promise.all([
+      this.regModel.find(filter).sort({ createdAt: -1 }).limit(50).populate('event', 'title slug').lean().exec(),
+      this.srModel.find(filter).sort({ createdAt: -1 }).limit(50).lean().exec(),
+    ]);
+
+    const eventos = (regs as any[]).map((r) => ({
+      evento: r.event?.title ?? 'Evento',
+      status: r.status,
+      comprovativo: r.paymentProof?.url ?? null,
+      data: r.createdAt,
+    }));
+    const servicos = (srs as any[]).map((s) => ({
+      serviceCode: s.serviceCode,
+      serviceType: s.serviceType,
+      status: s.status,
+      recibo: s.receipt?.url ?? null,
+      documento: Array.isArray(s.attachments) && s.attachments[0]?.url ? s.attachments[0].url : null,
+      data: s.createdAt,
+    }));
+    return { eventos, servicos };
+  }
 
   /** Carrega/atualiza a foto do médico (aparece nas buscas). */
   async setPhoto(id: string, file?: Express.Multer.File) {
@@ -434,6 +482,12 @@ export class MembersController {
   @Get('public/:numeroOrdem')
   publicVerify(@Param('numeroOrdem') numeroOrdem: string) { return this.s.publicByOrdem(numeroOrdem); }
 
+  // Atividade do médico no portal (eventos e serviços), verificado pelo código.
+  @Public()
+  @Throttle({ default: { limit: 15, ttl: 60_000 } })
+  @Post('atividade')
+  atividade(@Body() dto: AtividadeDto) { return this.s.atividade(dto.numeroUtente, dto.code); }
+
   // ---- Gestão (Ordem) ----
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR, UserRole.COLEGIO)
   @Get()
@@ -496,6 +550,8 @@ export class MembersController {
       { name: Member.name, schema: MemberSchema },
       { name: MemberChangeRequest.name, schema: ChangeRequestSchema },
       { name: CategoryRequest.name, schema: CategoryRequestSchema },
+      { name: EventRegistration.name, schema: RegistrationSchema },
+      { name: ServiceRequest.name, schema: ServiceRequestSchema },
     ]),
     UsersModule,
     CloudinaryModule,
