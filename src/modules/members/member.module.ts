@@ -313,6 +313,24 @@ export class MembersService implements OnApplicationBootstrap {
     if (opts.especialidade) filter.especialidade = opts.especialidade;
     return this.model.find(filter).sort({ createdAt: -1 }).limit(500).exec();
   }
+  /** Contagens para o dashboard (médicos, internos, especialistas, situação). */
+  async stats() {
+    const [total, internos, especialistas, orientadores, vigor, suspensa, cancelada] = await Promise.all([
+      this.model.countDocuments({}),
+      this.model.countDocuments({ categorias: 'interno' }),
+      this.model.countDocuments({ categorias: 'especialista' }),
+      this.model.countDocuments({ categorias: 'orientador' }),
+      this.model.countDocuments({ situacao: 'vigor' }),
+      this.model.countDocuments({ situacao: 'suspensa' }),
+      this.model.countDocuments({ situacao: 'cancelada' }),
+    ]);
+    return {
+      total, internos, especialistas, orientadores,
+      vigor, suspensa, cancelada,
+      regular: vigor, irregular: suspensa + cancelada,
+    };
+  }
+
   findOne(id: string) { return this.model.findById(id).exec(); }
   update(id: string, dto: UpdateMemberDto) { return this.model.findByIdAndUpdate(id, dto, { new: true }).exec(); }
   async remove(id: string) { await this.model.findByIdAndDelete(id).exec(); return { ok: true }; }
@@ -497,6 +515,10 @@ export class MembersController {
     @Query('categoria') categoria?: string,
     @Query('especialidade') especialidade?: string,
   ) { return this.s.findAll({ search, situacao, categoria, especialidade }); }
+
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
+  @Get('stats')
+  stats() { return this.s.stats(); }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
   @Get('change-requests/all')
