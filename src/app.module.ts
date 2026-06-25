@@ -45,6 +45,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { MembersModule } from './modules/members/member.module';
 import { CollegesModule } from './modules/colleges/college.module';
 import { QuotasModule } from './modules/quotas/quota.module';
+import { HeroModule } from './modules/hero/hero.module';
 
 @Module({
   imports: [
@@ -111,6 +112,7 @@ import { QuotasModule } from './modules/quotas/quota.module';
     MembersModule,
     CollegesModule,
     QuotasModule,
+    HeroModule,
   ],
   controllers: [HealthController],
   providers: [

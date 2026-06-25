@@ -25,6 +25,7 @@ const CONTENT_MAP: Record<string, string[]> = {
   partners: ['parceiros'],
   stats: ['estatisticas'],
   specialties: ['especialidades'],
+  hero: ['hero'],
   'research-support': ['apoio-pesquisa'],
   'service-requests': ['solicitacoes', 'validacoes'],
   'university-lists': ['listas-universidades'],

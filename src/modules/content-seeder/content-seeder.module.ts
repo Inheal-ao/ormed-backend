@@ -19,6 +19,28 @@ import {
   TestimonialSchema,
   TestimonialDocument,
 } from '../testimonials/testimonial.module';
+import { HeroSlide, HeroSlideSchema, HeroSlideDocument } from '../hero/hero.module';
+
+const DEFAULT_HERO = [
+  {
+    title: 'Pela Dignidade Médica', subtitle: 'Rumo à Excelência',
+    description: 'Há mais de 35 anos que existimos para garantir, ao profissional médico, o exercício da medicina em Angola com a dignidade merecida.',
+    image: { url: '/images/bastonaria-campaign.jpg', publicId: '' },
+    ctaLabel: 'Inscreva-se Agora', ctaHref: '/inscricao/', cta2Label: 'Saber Mais', cta2Href: '/sobre/', order: 0,
+  },
+  {
+    title: 'Ética e Deontologia', subtitle: 'Pilares da Profissão',
+    description: 'Pautamo-nos pelo rigor e cumprimento escrupuloso da ética e da deontologia profissional, visando prestar um serviço de saúde com qualidade.',
+    image: { url: '/images/bastonaria-2.jpg', publicId: '' },
+    ctaLabel: 'Código Deontológico', ctaHref: '/codigo-deontologico/', cta2Label: 'Denúncias', cta2Href: '/denuncias/', order: 1,
+  },
+  {
+    title: 'Formação Contínua', subtitle: 'Educação Permanente',
+    description: 'Programas de formação, workshops, webinars e congressos para manter os médicos angolanos na vanguarda do conhecimento médico.',
+    image: { url: '/images/bastonaria-1.jpg', publicId: '' },
+    ctaLabel: 'Próximos Eventos', ctaHref: '/eventos/', cta2Label: 'Área do Membro', cta2Href: '/area-membro/', order: 2,
+  },
+];
 
 const DEFAULT_STATS = [
   { value: '35+', label: 'Anos de Existência', icon: 'Calendar', order: 1 },
@@ -93,6 +115,7 @@ export class ContentSeederService implements OnApplicationBootstrap {
     @InjectModel(Faq.name) private readonly faqModel: Model<FaqDocument>,
     @InjectModel(Milestone.name) private readonly milestoneModel: Model<MilestoneDocument>,
     @InjectModel(Testimonial.name) private readonly testimonialModel: Model<TestimonialDocument>,
+    @InjectModel(HeroSlide.name) private readonly heroModel: Model<HeroSlideDocument>,
   ) {}
 
   async onApplicationBootstrap() {
@@ -102,6 +125,7 @@ export class ContentSeederService implements OnApplicationBootstrap {
     await this.seedIfEmpty('FAQs', this.faqModel, DEFAULT_FAQS.map((f, i) => ({ ...f, order: i })));
     await this.seedIfEmpty('cronologia', this.milestoneModel, DEFAULT_TIMELINE);
     await this.seedIfEmpty('testemunhos', this.testimonialModel, DEFAULT_TESTIMONIALS);
+    await this.seedIfEmpty('hero', this.heroModel, DEFAULT_HERO);
   }
 
   /** Garante que as 39 especialidades oficiais (ANEXO I) existem, mesmo que a coleção já tenha dados. */
@@ -148,6 +172,7 @@ export class ContentSeederService implements OnApplicationBootstrap {
       { name: Faq.name, schema: FaqSchema },
       { name: Milestone.name, schema: MilestoneSchema },
       { name: Testimonial.name, schema: TestimonialSchema },
+      { name: HeroSlide.name, schema: HeroSlideSchema },
     ]),
   ],
   providers: [ContentSeederService],
