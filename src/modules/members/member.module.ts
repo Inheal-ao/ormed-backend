@@ -315,7 +315,9 @@ export class MembersService implements OnApplicationBootstrap {
   }
   /** Contagens para o dashboard (médicos, internos, especialistas, situação). */
   async stats() {
-    const [total, internos, especialistas, orientadores, vigor, suspensa, cancelada] = await Promise.all([
+    const since = new Date(); since.setMonth(since.getMonth() - 5); since.setDate(1); since.setHours(0, 0, 0, 0);
+    const startMonth = new Date(); startMonth.setDate(1); startMonth.setHours(0, 0, 0, 0);
+    const [total, internos, especialistas, orientadores, vigor, suspensa, cancelada, novosMes, agg] = await Promise.all([
       this.model.countDocuments({}),
       this.model.countDocuments({ categorias: 'interno' }),
       this.model.countDocuments({ categorias: 'especialista' }),
@@ -323,11 +325,26 @@ export class MembersService implements OnApplicationBootstrap {
       this.model.countDocuments({ situacao: 'vigor' }),
       this.model.countDocuments({ situacao: 'suspensa' }),
       this.model.countDocuments({ situacao: 'cancelada' }),
+      this.model.countDocuments({ createdAt: { $gte: startMonth } }),
+      this.model.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        { $group: { _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' } }, n: { $sum: 1 } } },
+      ]),
     ]);
+    // Série dos últimos 6 meses (para sparkline de crescimento).
+    const porMes: { mes: string; total: number }[] = [];
+    const map: Record<string, number> = {};
+    for (const a of agg as { _id: { y: number; m: number }; n: number }[]) map[`${a._id.y}-${a._id.m}`] = a.n;
+    const now = new Date();
+    for (let k = 5; k >= 0; k--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+      porMes.push({ mes: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, total: map[`${d.getFullYear()}-${d.getMonth() + 1}`] ?? 0 });
+    }
     return {
       total, internos, especialistas, orientadores,
       vigor, suspensa, cancelada,
       regular: vigor, irregular: suspensa + cancelada,
+      novosMes, porMes,
     };
   }
 

@@ -94,6 +94,22 @@ export class QuotasService {
     if (!s) s = await this.settingsModel.create({ cotaMensal: 0, multaMensal: 0, inicioCobranca: `${new Date().getFullYear()}-01` });
     return s;
   }
+  /** Estatísticas financeiras de cotas para o dashboard. */
+  async stats() {
+    const s = await this.getSettings();
+    const startMonth = new Date(); startMonth.setDate(1); startMonth.setHours(0, 0, 0, 0);
+    const [aggAll, aggMes] = await Promise.all([
+      this.payModel.aggregate([{ $group: { _id: null, total: { $sum: '$total' }, n: { $sum: 1 } } }]),
+      this.payModel.aggregate([{ $match: { createdAt: { $gte: startMonth } } }, { $group: { _id: null, total: { $sum: '$total' }, n: { $sum: 1 } } }]),
+    ]);
+    return {
+      cotaMensal: s.cotaMensal, multaMensal: s.multaMensal,
+      arrecadadoTotal: (aggAll as { total: number }[])[0]?.total ?? 0,
+      pagamentosTotal: (aggAll as { n: number }[])[0]?.n ?? 0,
+      arrecadadoMes: (aggMes as { total: number }[])[0]?.total ?? 0,
+      pagamentosMes: (aggMes as { n: number }[])[0]?.n ?? 0,
+    };
+  }
   async updateSettings(dto: SettingsDto, actor: AuthUser & { name?: string }) {
     const s = await this.getSettings();
     if (dto.cotaMensal !== undefined) s.cotaMensal = dto.cotaMensal;
@@ -180,6 +196,8 @@ export class QuotasController {
 
   @Roles(...ADMIN) @Get('settings')
   getSettings() { return this.s.getSettings(); }
+  @Roles(...ADMIN) @Get('stats')
+  stats() { return this.s.stats(); }
   @Roles(...SET) @Put('settings')
   setSettings(@Body() dto: SettingsDto, @CurrentUser() a: AuthUser) { return this.s.updateSettings(dto, a); }
 
