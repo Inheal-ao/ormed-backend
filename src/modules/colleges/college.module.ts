@@ -15,7 +15,7 @@ import { CloudinaryModule } from '../../cloudinary/cloudinary.module';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
 import { UsersModule } from '../../users/users.module';
 import { UsersService } from '../../users/users.service';
-import { Member, MemberSchema, MemberDocument } from '../members/member.module';
+import { Member, MemberSchema, MemberDocument, memberCodeMatches } from '../members/member.module';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
@@ -378,8 +378,8 @@ export class CollegesService {
 
   // ===== Vista do Médico Interno (acesso pelo código do portal do membro) =====
   async internoDossier(dto: InternoDossierDto) {
-    const m = await this.members.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash').exec();
-    if (!m || !(m as any).accessCodeHash || !(await bcrypt.compare(dto.code.trim(), (m as any).accessCodeHash))) {
+    const m = await this.members.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash +recoveryCodesHash').exec();
+    if (!m || !(await memberCodeMatches(m as any, dto.code))) {
       throw new ForbiddenException('Código de acesso inválido.');
     }
     if (!(m.categorias ?? []).includes('interno')) return { isInterno: false };

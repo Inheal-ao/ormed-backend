@@ -62,6 +62,18 @@ export class Member {
   @Prop({ default: false }) simulado: boolean;
   // Código de acesso de 6 dígitos (cifrado). select:false
   @Prop({ type: String, default: null, select: false }) accessCodeHash: string | null;
+  // Novo mecanismo de acesso: senha + conjunto de códigos de recuperação (cifrados).
+  @Prop({ type: String, default: null, select: false }) passwordHash: string | null;
+  @Prop({ type: [String], default: [], select: false }) recoveryCodesHash: string[];
+}
+
+/** Verifica se um código corresponde ao código de acesso (legado) ou a um dos códigos de recuperação. */
+export async function memberCodeMatches(m: { accessCodeHash?: string | null; recoveryCodesHash?: string[] }, code: string): Promise<boolean> {
+  const c = (code || '').trim();
+  if (!c) return false;
+  if (m.accessCodeHash && (await bcrypt.compare(c, m.accessCodeHash))) return true;
+  for (const h of m.recoveryCodesHash ?? []) { if (await bcrypt.compare(c, h)) return true; }
+  return false;
 }
 export const MemberSchema = SchemaFactory.createForClass(Member);
 
@@ -143,6 +155,25 @@ class AtividadeDto {
   @IsString() numeroUtente: string;
   @IsString() @MinLength(6) @MaxLength(6) code: string;
 }
+class PortalLoginDto {
+  @IsEmail() email: string;
+  @IsString() @MinLength(1) @MaxLength(100) password: string;
+  @IsString() @MinLength(6) @MaxLength(6) code: string;
+}
+class CodeAuthDto {
+  @IsString() numeroUtente: string;
+  @IsString() @MinLength(6) @MaxLength(6) code: string;
+}
+class SetPasswordDto {
+  @IsString() numeroUtente: string;
+  @IsString() @MinLength(6) @MaxLength(6) code: string;
+  @IsString() @MinLength(8) @MaxLength(100) password: string;
+}
+class RecoverDto {
+  @IsEmail() email: string;
+  @IsString() @MinLength(6) @MaxLength(6) code: string;
+  @IsString() @MinLength(8) @MaxLength(100) password: string;
+}
 class CategoryReqDto {
   @IsString() memberId: string;
   @IsIn(['interno', 'especialista', 'orientador']) categoria: string;
@@ -163,10 +194,10 @@ export class MembersService implements OnApplicationBootstrap {
     private readonly cloudinary: CloudinaryService,
   ) {}
 
-  /** Verifica um médico apenas pelo nº de utente + código (portal). */
+  /** Verifica um médico apenas pelo nº de utente + código (legado ou recuperação). */
   private async verifyByCode(numeroUtente: string, code: string): Promise<MemberDocument> {
-    const m = await this.model.findOne({ numeroUtente: (numeroUtente || '').trim() }).select('+accessCodeHash').exec();
-    if (!m || !m.accessCodeHash || !(await bcrypt.compare((code || '').trim(), m.accessCodeHash))) {
+    const m = await this.model.findOne({ numeroUtente: (numeroUtente || '').trim() }).select('+accessCodeHash +recoveryCodesHash').exec();
+    if (!m || !(await memberCodeMatches(m, code))) {
       throw new ForbiddenException('Código de acesso inválido.');
     }
     return m;
@@ -269,7 +300,7 @@ export class MembersService implements OnApplicationBootstrap {
 
   private safe(m: MemberDocument) {
     const o = m.toObject ? m.toObject() : (m as any);
-    delete o.accessCodeHash;
+    delete o.accessCodeHash; delete o.passwordHash; delete o.recoveryCodesHash;
     return o;
   }
 
@@ -363,29 +394,74 @@ export class MembersService implements OnApplicationBootstrap {
 
   /** Verifica as 5 credenciais e devolve a ficha. */
   async access(dto: AccessDto) {
-    const m = await this.model.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash').exec();
+    const m = await this.model.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash +recoveryCodesHash').exec();
     const fail = () => { throw new ForbiddenException('Dados de acesso inválidos. Verifique e tente novamente.'); };
-    if (!m || !m.accessCodeHash) fail();
-    if (m && m.situacao !== 'vigor') {
-      throw new ForbiddenException(
-        m.situacao === 'suspensa'
-          ? 'A sua inscrição encontra-se suspensa. Regularize a sua situação junto da Ordem.'
-          : 'A sua inscrição encontra-se cancelada.',
-      );
+    if (!m) fail();
+    if (m && m.situacao === 'cancelada') {
+      throw new ForbiddenException('A sua inscrição encontra-se cancelada.');
     }
     const ok =
       m!.biPassaporte.toLowerCase() === dto.biPassaporte.trim().toLowerCase() &&
       m!.phone === dto.phone.trim() &&
       m!.numeroOrdem.toLowerCase() === dto.numeroOrdem.trim().toLowerCase() &&
-      (await bcrypt.compare(dto.code.trim(), m!.accessCodeHash!));
+      (await memberCodeMatches(m!, dto.code));
     if (!ok) fail();
     return this.safe(m!);
   }
 
+  // ===== Novo mecanismo: email + senha + código de recuperação =====
+
+  /** Login pelo portal: email + senha + um dos códigos de recuperação. */
+  async portalLogin(email: string, password: string, code: string) {
+    const m = await this.model.findOne({ email: (email || '').trim().toLowerCase() }).select('+accessCodeHash +recoveryCodesHash +passwordHash').exec();
+    const fail = () => { throw new ForbiddenException('Email, senha ou código inválidos.'); };
+    if (!m || !m.passwordHash) fail();
+    if (m!.situacao === 'cancelada') throw new ForbiddenException('A sua inscrição encontra-se cancelada.');
+    const okPw = await bcrypt.compare(password || '', m!.passwordHash!);
+    const okCode = await memberCodeMatches(m!, code);
+    if (!okPw || !okCode) fail();
+    return this.safe(m!);
+  }
+
+  /** Define/altera a senha (autenticado por nº de utente + código). */
+  async setPortalPassword(numeroUtente: string, code: string, password: string) {
+    const m = await this.verifyByCode(numeroUtente, code);
+    m.passwordHash = await bcrypt.hash(password, 12);
+    await m.save();
+    return { ok: true };
+  }
+
+  /** Gera um novo conjunto de códigos de recuperação (devolve-os uma vez). */
+  async generateRecoveryCodes(numeroUtente: string, code: string) {
+    const m = await this.verifyByCode(numeroUtente, code);
+    const codes = Array.from({ length: 8 }, () => String(randomInt(0, 1_000_000)).padStart(6, '0'));
+    m.recoveryCodesHash = await Promise.all(codes.map((c) => bcrypt.hash(c, 12)));
+    await m.save();
+    return { codes };
+  }
+
+  /** Recuperar a senha: email + um código de recuperação -> nova senha. */
+  async recoverPassword(email: string, code: string, password: string) {
+    const m = await this.model.findOne({ email: (email || '').trim().toLowerCase() }).select('+accessCodeHash +recoveryCodesHash').exec();
+    if (!m || !(await memberCodeMatches(m, code))) {
+      throw new ForbiddenException('Email ou código inválidos.');
+    }
+    m.passwordHash = await bcrypt.hash(password, 12);
+    await m.save();
+    return { ok: true };
+  }
+
+  /** Indica se o médico já tem senha definida (para o portal sugerir a configuração). */
+  async hasPassword(numeroUtente: string, code: string) {
+    const m = await this.model.findOne({ numeroUtente: (numeroUtente || '').trim() }).select('+accessCodeHash +recoveryCodesHash +passwordHash').exec();
+    if (!m || !(await memberCodeMatches(m, code))) throw new ForbiddenException('Código inválido.');
+    return { hasPassword: !!m.passwordHash, hasRecoveryCodes: (m.recoveryCodesHash ?? []).length > 0, email: m.email };
+  }
+
   /** Cria um pedido de alteração (re-verifica nº de utente + código). */
   async requestChange(dto: ChangeReqDto) {
-    const m = await this.model.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash').exec();
-    if (!m || !m.accessCodeHash || !(await bcrypt.compare(dto.code.trim(), m.accessCodeHash))) {
+    const m = await this.model.findOne({ numeroUtente: dto.numeroUtente.trim() }).select('+accessCodeHash +recoveryCodesHash').exec();
+    if (!m || !(await memberCodeMatches(m, dto.code))) {
       throw new ForbiddenException('Código de acesso inválido.');
     }
     const changes: Record<string, string> = {};
@@ -522,6 +598,27 @@ export class MembersController {
   @Throttle({ default: { limit: 15, ttl: 60_000 } })
   @Post('atividade')
   atividade(@Body() dto: AtividadeDto) { return this.s.atividade(dto.numeroUtente, dto.code); }
+
+  // ---- Novo mecanismo de acesso (email + senha + código) ----
+  @Public() @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('portal/login')
+  portalLogin(@Body() dto: PortalLoginDto) { return this.s.portalLogin(dto.email, dto.password, dto.code); }
+
+  @Public() @Throttle({ default: { limit: 8, ttl: 60_000 } })
+  @Post('portal/has-password')
+  hasPassword(@Body() dto: CodeAuthDto) { return this.s.hasPassword(dto.numeroUtente, dto.code); }
+
+  @Public() @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @Post('portal/set-password')
+  setPassword(@Body() dto: SetPasswordDto) { return this.s.setPortalPassword(dto.numeroUtente, dto.code, dto.password); }
+
+  @Public() @Throttle({ default: { limit: 4, ttl: 60_000 } })
+  @Post('portal/recovery-codes')
+  recoveryCodes(@Body() dto: CodeAuthDto) { return this.s.generateRecoveryCodes(dto.numeroUtente, dto.code); }
+
+  @Public() @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @Post('portal/recover')
+  recover(@Body() dto: RecoverDto) { return this.s.recoverPassword(dto.email, dto.code, dto.password); }
 
   // ---- Gestão (Ordem) ----
   @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR, UserRole.COLEGIO)

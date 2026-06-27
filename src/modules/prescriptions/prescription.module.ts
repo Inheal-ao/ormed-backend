@@ -11,7 +11,7 @@ import { IsArray, IsOptional, IsString, MaxLength, MinLength } from 'class-valid
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
-import { Member, MemberSchema, MemberDocument } from '../members/member.module';
+import { Member, MemberSchema, MemberDocument, memberCodeMatches } from '../members/member.module';
 
 // ===== Schema =====
 @Schema({ _id: false })
@@ -100,8 +100,8 @@ export class PrescriptionsService {
   ) {}
 
   private async verifyMedico(numeroUtente: string, code: string): Promise<MemberDocument> {
-    const m = await this.members.findOne({ numeroUtente: (numeroUtente || '').trim() }).select('+accessCodeHash').exec();
-    if (!m || !m.accessCodeHash || !(await bcrypt.compare((code || '').trim(), m.accessCodeHash))) {
+    const m = await this.members.findOne({ numeroUtente: (numeroUtente || '').trim() }).select('+accessCodeHash +recoveryCodesHash').exec();
+    if (!m || !(await memberCodeMatches(m, code))) {
       throw new ForbiddenException('Código de acesso inválido.');
     }
     if (m.situacao !== 'vigor') {

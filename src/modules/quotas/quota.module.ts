@@ -13,7 +13,7 @@ import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '../../users/schemas/user.schema';
-import { Member, MemberSchema, MemberDocument } from '../members/member.module';
+import { Member, MemberSchema, MemberDocument, memberCodeMatches } from '../members/member.module';
 
 const ADMIN = [UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR];
 const SET = [UserRole.SUPER_ADMIN, UserRole.BASTONARIA]; // só a Bastonária define valores
@@ -166,10 +166,10 @@ export class QuotasService {
     return this.pay(m, dto.meses, 'balcao', registadoPor);
   }
 
-  // ---- Portal (verificado pelo código de acesso) ----
+  // ---- Portal (verificado pelo código de acesso ou de recuperação) ----
   private async verify(numeroUtente: string, code: string) {
-    const m = await this.members.findOne({ numeroUtente: numeroUtente.trim() }).select('+accessCodeHash').exec();
-    if (!m || !(m as any).accessCodeHash || !(await bcrypt.compare(code.trim(), (m as any).accessCodeHash))) {
+    const m = await this.members.findOne({ numeroUtente: numeroUtente.trim() }).select('+accessCodeHash +recoveryCodesHash').exec();
+    if (!m || !(await memberCodeMatches(m as any, code))) {
       throw new ForbiddenException('Código de acesso inválido.');
     }
     return m;
