@@ -208,7 +208,7 @@ export class PrescriptionsController {
   @Post('mine')
   mine(@Body() dto: MineDto) { return this.s.mine(dto); }
 
-  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.BASTONARIA, UserRole.EDITOR, UserRole.FUNCIONARIO)
   @Get('admin/all')
   all() { return this.s.listAll(); }
 }

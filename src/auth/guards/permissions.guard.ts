@@ -38,6 +38,7 @@ const CONTENT_MAP: Record<string, string[]> = {
   settings: ['definicoes'],
   members: ['membros'],
   colleges: ['colegios', 'internos', 'programas-internato', 'notas-rotacoes'],
+  prescriptions: ['receitas'],
 };
 
 function sectionFor(path: string): string[] | null {
