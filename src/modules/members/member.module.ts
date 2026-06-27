@@ -248,11 +248,10 @@ export class MembersService implements OnApplicationBootstrap {
   /** Banco de médicos simulado para testes — substituível por médicos reais. */
   async onApplicationBootstrap() {
     try {
-      if ((await this.model.estimatedDocumentCount()) > 0) return;
       const TEST_CODE = '123456';
       const hash = await bcrypt.hash(TEST_CODE, 12);
-      const year = new Date().getFullYear();
-      const provincias = ['Luanda', 'Benguela', 'Huambo', 'Huíla', 'Cabinda', 'Malanje', 'Namibe'];
+      const year = 2026;
+      const provincias = ['Luanda', 'Benguela', 'Huambo', 'Huíla', 'Cabinda', 'Malanje', 'Namibe', 'Uíge', 'Cuanza Sul', 'Bié'];
       const nomes = [
         'António Manuel Silva', 'Maria José Fernandes', 'Pedro Kiala Lukombo', 'Ana Paula Costa',
         'João Baptista Neto', 'Esperança Domingos', 'Carlos Alberto Mendes', 'Luísa Cativa',
@@ -260,6 +259,16 @@ export class MembersService implements OnApplicationBootstrap {
         'Rui Gonçalves Dias', 'Beatriz Ngola', 'Hélder Capemba', 'Joana Muxima',
         'Domingos Tchikuteny', 'Cristina Lourenço', 'Eduardo Cardoso', 'Marta Sousa Lemos',
         'Nelson Kapenda', 'Sandra Catraio', 'Osvaldo Quéssua', 'Isabel Chitanda', 'Fernando Mukinda',
+        'Paulo Capita', 'Lúcia Ngongo', 'Mário Bengui', 'Edna Sapalo', 'Gerson Tchindandi',
+        'Núria Saluquele', 'Wilson Cahama', 'Aida Quitumba', 'Bruno Calandula', 'Catarina Mbumba',
+        'Délcio Sachilombo', 'Eugénia Kawa', 'Fábio Lutucuta', 'Gisela Nteka', 'Hugo Mussumari',
+        'Irene Calussa', 'Jorge Hossi', 'Kátia Lemba', 'Leonel Cassinda', 'Mónica Vunge',
+        'Nuno Cahanga', 'Olga Tchikola', 'Patrício Mbongo', 'Quina Salukombo', 'Ricardo Camati',
+        'Sónia Lukeny', 'Tomás Chissingui', 'Ubaldo Mbangu', 'Vera Quibeto', 'Xavier Canjala',
+        'Yara Sahando', 'Zito Mukongo', 'Albertina Cahenda', 'Belmiro Ndombele', 'Celestina Quivuna',
+        'Hermenegildo Cassule', 'Liliana Camue', 'Adelino Tchipalanga', 'Rosária Mbemba', 'Severino Caquesse',
+        'Domingas Lussinde', 'Abel Quissungo', 'Engrácia Kanjangu', 'Iracema Bunga', 'Job Mavakala',
+        'Kembua Lando', 'Madalena Quissol', 'Octávio Sachipengo', 'Palmira Ngueve', 'Salvador Tchitchi',
       ];
       const esp = [
         'Medicina Interna', 'Cardiologia', 'Pediatria', 'Cirurgia Geral', 'Ginecologia e Obstetrícia',
@@ -291,8 +300,14 @@ export class MembersService implements OnApplicationBootstrap {
           accessCodeHash: hash,
         };
       });
-      await this.model.insertMany(docs);
-      this.logger.log(`Banco de médicos simulado criado (${docs.length} médicos). Código de acesso de teste: ${TEST_CODE}`);
+      // Insere apenas os que ainda não existem (permite acrescentar novos sem duplicar).
+      const existing = await this.model.find({ numeroUtente: { $in: docs.map((d) => d.numeroUtente) } }, 'numeroUtente').lean().exec();
+      const have = new Set(existing.map((d: any) => d.numeroUtente));
+      const toInsert = docs.filter((d) => !have.has(d.numeroUtente));
+      if (toInsert.length) {
+        await this.model.insertMany(toInsert);
+        this.logger.log(`Banco de médicos simulado: +${toInsert.length} médicos (total alvo ${docs.length}). Código de teste: ${TEST_CODE}`);
+      }
     } catch (err) {
       this.logger.error(`Falha a semear médicos simulados: ${(err as Error).message}`);
     }
