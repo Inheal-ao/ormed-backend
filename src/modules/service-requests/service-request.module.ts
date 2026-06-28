@@ -39,7 +39,8 @@ const TYPE_PREFIX: Record<string, string> = {
 };
 const ALLOWED_STATUSES = [
   'recebido', 'em-analise', 'rejeitado', 'validado', 'nao-validado',
-  'aguarda-pagamento', 'pagamento-em-analise', 'pago', 'recibo-emitido', 'concluido',
+  'aguarda-pagamento', 'pagamento-em-analise', 'pago', 'recibo-emitido',
+  'enviado-bastonaria', 'aprovado-impressao', 'concluido',
 ];
 
 @Schema({ timestamps: true })
@@ -62,6 +63,9 @@ export class ServiceRequest {
   @Prop({ type: AssetSchema, default: null }) paymentProof: Asset | null; // comprovativo do user
   @Prop({ type: AssetSchema, default: null }) receipt: Asset | null; // recibo emitido pelo operador
   @Prop({ default: '', trim: true }) adminNotes: string;
+  // Emissão final (inscrição → 1ª carteira): nº de ordem atribuído + se as credenciais já foram emitidas
+  @Prop({ default: '', trim: true }) memberNumeroOrdem: string;
+  @Prop({ default: false }) credentialsIssued: boolean;
   // Histórico de etapas (quem fez o quê e quando)
   @Prop({
     type: [{ at: Date, by: String, action: String, status: String }],
@@ -93,6 +97,13 @@ class UpdateStatusDto {
 class SetPaymentDto {
   @IsString() @MaxLength(60) paymentAmount: string;
   @IsString() @MaxLength(1000) paymentInstructions: string;
+}
+class BastonariaDecisionDto {
+  @IsIn(['aprovar', 'devolver']) decision: string;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
+class EmitCarteiraDto {
+  @IsString() @MinLength(2) @MaxLength(40) numeroOrdem: string;
 }
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -145,10 +156,13 @@ export class ServiceRequestsService {
   }
 
   async create(dto: CreateServiceRequestDto, files: Express.Multer.File[]) {
-    if (!files || files.length === 0) {
+    // A inscrição e a validação exigem documentos; os pedidos do médico (renovação,
+    // 2ª via da carteira, declaração, cotas) podem não ter anexo à partida.
+    const needsFiles = ['inscricao', 'validacao-documentos'].includes(dto.serviceType);
+    if (needsFiles && (!files || files.length === 0)) {
       throw new BadRequestException('Anexe pelo menos um documento.');
     }
-    const attachments = await this.uploadFiles(files);
+    const attachments = files?.length ? await this.uploadFiles(files) : [];
     const serviceCode = await this.genUniqueCode(dto.serviceType);
     const doc = await this.model.create({
       serviceType: dto.serviceType,
@@ -186,6 +200,7 @@ export class ServiceRequestsService {
       hasPaymentProof: !!d.paymentProof,
       receiptUrl: d.receipt?.url ?? null,
       canSubmitProof,
+      credentialsIssued: !!d.credentialsIssued,
       createdAt: (d as any).createdAt,
       // Linha do tempo pública (sem nomes de operadores)
       timeline: (d.history ?? []).map((h) => ({ at: h.at, action: h.action, status: h.status })),
@@ -273,6 +288,64 @@ export class ServiceRequestsService {
     await d.save();
     return d;
   }
+
+  /** Funcionário envia o processo (pago) para aprovação de impressão pela Bastonária. */
+  async sendToBastonaria(id: string, user?: AuthUser) {
+    const d = await this.model.findById(id).exec();
+    if (!d) throw new NotFoundException('Solicitação não encontrada.');
+    if (d.serviceType !== 'inscricao') {
+      throw new BadRequestException('Só as inscrições seguem para aprovação da Bastonária.');
+    }
+    if (!['pago', 'recibo-emitido'].includes(d.status)) {
+      throw new BadRequestException('O processo só segue para a Bastonária após o pagamento estar confirmado.');
+    }
+    const by = await this.operatorName(user);
+    d.status = 'enviado-bastonaria';
+    d.history.push({ at: new Date(), by, action: 'Enviado à Bastonária para aprovação de impressão', status: 'enviado-bastonaria' });
+    await d.save();
+    return d;
+  }
+
+  /** Bastonária aprova (para impressão) ou devolve o processo. */
+  async bastonariaDecision(id: string, dto: BastonariaDecisionDto, user?: AuthUser) {
+    const d = await this.model.findById(id).exec();
+    if (!d) throw new NotFoundException('Solicitação não encontrada.');
+    if (d.status !== 'enviado-bastonaria') {
+      throw new BadRequestException('Este processo não está a aguardar a decisão da Bastonária.');
+    }
+    const by = await this.operatorName(user);
+    if (dto.decision === 'aprovar') {
+      d.status = 'aprovado-impressao';
+      if (dto.note) d.statusDetail = dto.note;
+      d.history.push({ at: new Date(), by, action: 'Aprovado pela Bastonária para emissão da carteira', status: 'aprovado-impressao' });
+    } else {
+      d.status = 'pago';
+      d.statusDetail = dto.note ?? 'Devolvido pela Bastonária';
+      d.history.push({ at: new Date(), by, action: `Devolvido pela Bastonária${dto.note ? ' — ' + dto.note : ''}`, status: 'pago' });
+    }
+    await d.save();
+    return d;
+  }
+
+  /**
+   * Marca a inscrição como concluída após a equipa atribuir o nº de ordem e emitir
+   * a carteira (o registo do médico é feito à parte, em /members). Regista que as
+   * credenciais foram emitidas para entrega ao candidato.
+   */
+  async markEmitida(id: string, dto: EmitCarteiraDto, user?: AuthUser) {
+    const d = await this.model.findById(id).exec();
+    if (!d) throw new NotFoundException('Solicitação não encontrada.');
+    if (d.status !== 'aprovado-impressao') {
+      throw new BadRequestException('A carteira só pode ser emitida após a aprovação da Bastonária.');
+    }
+    const by = await this.operatorName(user);
+    d.memberNumeroOrdem = dto.numeroOrdem.trim();
+    d.credentialsIssued = true;
+    d.status = 'concluido';
+    d.history.push({ at: new Date(), by, action: `Carteira emitida — nº de ordem ${d.memberNumeroOrdem}; credenciais emitidas`, status: 'concluido' });
+    await d.save();
+    return d;
+  }
 }
 
 @Controller('service-requests')
@@ -334,6 +407,27 @@ export class ServiceRequestsController {
   @UseInterceptors(FileInterceptor('receipt', UPLOAD_LIMITS))
   receipt(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: AuthUser) {
     return this.s.uploadReceipt(id, file, user);
+  }
+
+  // Funcionário/admin: envia a inscrição paga para a Bastonária
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
+  @Patch(':id/send-to-bastonaria')
+  sendToBastonaria(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.s.sendToBastonaria(id, user);
+  }
+
+  // Exclusivo da Bastonária (super_admin também passa): aprova/devolve a impressão
+  @Roles(UserRole.BASTONARIA)
+  @Patch(':id/bastonaria')
+  bastonaria(@Param('id') id: string, @Body() dto: BastonariaDecisionDto, @CurrentUser() user: AuthUser) {
+    return this.s.bastonariaDecision(id, dto, user);
+  }
+
+  // Funcionário/admin: marca a carteira como emitida (após aprovação da Bastonária)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
+  @Patch(':id/emitida')
+  emitida(@Param('id') id: string, @Body() dto: EmitCarteiraDto, @CurrentUser() user: AuthUser) {
+    return this.s.markEmitida(id, dto, user);
   }
 
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.EDITOR)
